@@ -119,18 +119,6 @@ summary { padding: var(--space-2) 0; align-content: center; font-weight: 700; }
   .workflow ol { grid-template-columns: minmax(0, 1fr); }
   .workflow button { flex-direction: row; justify-content: start; gap: var(--space-2); padding-inline: var(--space-3); }
 }
-@media print {
-  .topbar, .intro, .workflow, #terms-form, #scope-summary, #catalog-status, .quote button { display: none !important; }
-  :root { color-scheme: light; }
-  body, .step { background: white; color: black; }
-  .quote :is(.muted, .meta, .grade, .source-info, .specs dt, a) { color: black; }
-  .quote :is(.notice, .totals) { background: white; border: 1px solid GrayText; }
-  .quote a { text-decoration: underline; }
-  .workspace { display: block; }
-  .step { border: 0; padding: 0; }
-  .quote { margin: 0; }
-  .totals, .selected-line { break-inside: avoid; }
-}
 
 .source-info + .source-link { margin-inline-start: var(--space-1); }
 .footer { align-items: center; }
@@ -144,3 +132,53 @@ summary { padding: var(--space-2) 0; align-content: center; font-weight: 700; }
 .open-checks .specs { margin-block: var(--space-2); }
 .open-checks li > p { margin-bottom: var(--space-1); }
 .open-checks section { border-top: 1px solid var(--border); padding-top: var(--space-3); }
+
+@page { margin: 12mm; }
+
+@media print {
+  :root { color-scheme: light; }
+  body { min-height: 0; background: white; color: black; font-size: 10pt; line-height: 1.28; }
+  .topbar, .intro, .workflow, #terms-form, #scope-summary, #catalog-status,
+  #title-4, .quote .actions, .skip-link { display: none !important; }
+  .shell { width: auto; max-width: none; margin: 0; padding: 0; }
+  .workspace { display: block; }
+  .step, .quote { padding: 0; margin: 0; border: 0; background: white; color: black; }
+  .quote p { max-width: none; }
+  .quote h3 { font-size: 16pt; }
+  .quote h4 { font-size: 11pt; }
+  .quote :is(h3, h4, summary) { break-after: avoid; margin: 2.5mm 0 1mm; }
+  .quote :is(p, li) { orphans: 2; widows: 2; }
+
+  .quote .specs { margin: 0 0 2mm; }
+  .quote .specs div {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 3mm;
+    border-color: GrayText;
+    padding: 1mm 0;
+    break-inside: avoid;
+  }
+  .quote :is(.muted, .meta, .source-info, .specs dt, a) { color: black; font-size: inherit; }
+  .quote .grade { color: black; border: 0; padding: 0; font-size: inherit; }
+  .quote .source-info { margin: 0; }
+  .quote .source-link { display: inline; min-height: 0; padding: 0; margin: 0 1.5mm 0 0; text-decoration: underline; }
+  .quote .product-source { break-inside: avoid; margin: 1mm 0 2mm; }
+
+  .quote :is(.notice, .totals, .review, .variant) {
+    margin: 2mm 0;
+    padding: 1.5mm 2mm;
+    border: 1px solid GrayText;
+    border-radius: 0;
+    background: white;
+  }
+  .quote .totals { break-inside: avoid; }
+  .quote .totals .specs dd { text-align: right; }
+  .quote .totals .specs div:last-child { font-weight: bold; }
+  .quote :is(summary, .variant-detail, .selected-line) { min-height: 0; padding: 1mm 0; }
+  .quote summary { display: block; }
+  .quote .inline-list { margin: 1mm 0 2mm; padding-inline-start: 4mm; }
+  .quote .inline-list li, .quote p { margin-bottom: 1mm; }
+  .quote .open-checks section { padding-top: 1mm; }
+  .footer { break-inside: avoid; margin: 3mm 0 0; font-size: 9pt; color: black; }
+  .footer .source-link { min-height: 0; padding: 0; color: black; }
+}

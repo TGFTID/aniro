@@ -53,10 +53,8 @@ function pdfLinks(source) {
 
 function productSource(product) {
   const source = product.source ?? {};
-  return [
-    sourceLink(source.url, 'Karta katalogowa Aniro'),
-    '<p class="source-info">' + text([source.retrieved_date, source.source_record_id ?? product.id].filter(Boolean).join(' / ')) + '</p>',
-  ].join('');
+  return '<div class="product-source">' + sourceLink(source.url, 'Karta katalogowa Aniro')
+    + '<p class="source-info">' + text([source.retrieved_date, source.source_record_id ?? product.id].filter(Boolean).join(' / ')) + '</p></div>';
 }
 
 function list(values) {
@@ -503,9 +501,10 @@ function renderQuote(option, terms, result) {
     + '<div><dt>Źródło warunków handlowych</dt><dd>' + text(terms.commercialSource) + '</dd></div>'
     + '<div><dt>Ceny katalogowe</dt><dd>' + (terms.priceBasis === 'net' ? 'Netto' : 'Brutto') + '</dd></div>'
     + '<div><dt>VAT / rabat</dt><dd>' + text(terms.vatRate) + '% / ' + text(terms.discountRate) + '%</dd></div></dl>'
-    + unresolvedRequirements(option.lines, true) + offerLines(option) + showPair(option.pair)
+    + '<section class="commercial-summary" aria-labelledby="commercial-title">'
+    + '<h4 id="commercial-title">Podsumowanie według walut</h4>' + totals + '</section>'
+    + unresolvedRequirements(option.lines, true) + '<h4>Wskazane pozycje i dowody</h4>' + offerLines(option) + showPair(option.pair)
     + '<h4>Ograniczenia doboru i montażu</h4>' + list(state.result.checklist)
-    + '<h4>Podsumowanie według walut</h4>' + totals
     + '<details><summary>Sposób obliczeń</summary>' + list(result.formulas) + '</details>'
     + '<details><summary>Pomiary i źródła</summary>' + printMeasurements() + '</details>'
     + '<div class="actions"><button type="button" id="print-quote">Drukuj / zapisz PDF</button></div>';

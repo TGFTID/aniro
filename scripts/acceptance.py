@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
+import fitz
 from playwright.sync_api import expect, sync_playwright
 
 
@@ -100,6 +101,20 @@ def open_card_details(card):
         details.locator("summary").first.click()
 
 
+def verify_printed_offer(page):
+    output = ARTIFACTS / "partial-offer.pdf"
+    page.pdf(path=str(output), format="A4", print_background=True)
+    with fitz.open(output) as pdf:
+        pages = [" ".join(p.get_text().split()) for p in pdf]
+    content = " ".join(pages)
+    for required in ["Częściowa wycena", "Spełnienie wymagań obiektu niepotwierdzone", "2000 kW",
+                     "SUNWODA OASIS 60KWH", "SINEXCEL ISUNA 20000T", "2026-11-17", "Sposób obliczeń"]:
+        assert required in content, "Brak informacji w wydruku: " + required
+    assert "29121,19" in compact(pages[0]), "Suma kwot powinna być na pierwszej stronie"
+    assert all(len(page_text) >= 100 for page_text in pages), "Strona z pojedynczym fragmentem tekstu"
+    return len(pages)
+
+
 def audit(preview):
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -169,6 +184,8 @@ def audit(preview):
         results.append("ASVG 100 Cabinet pokazuje rozbieżność 13/15 i ręczny status.")
         open_scenario(page, "storage-inverter")
         enter_measurements(page, {**PAIR, "storagePowerKw": "2000"})
+        page.locator("#find-model").fill("MODEL_ZERO_WYNIKOW")
+        expect(page.locator("#groups")).to_contain_text("Brak pozycji dla wybranych filtrów")
         choose_product(page, OASIS, "storage")
         choose_product(page, ISUNA, "inverter")
         selected = page.locator("#selected")
@@ -188,6 +205,7 @@ def audit(preview):
         expect(open_checks).to_contain_text("Spełnienie wymagań obiektu niepotwierdzone")
         expect(open_checks).to_contain_text("2000 kW")
         quote.screenshot(path=str(ARTIFACTS / "documented-pair.png"))
+        pdf_pages = verify_printed_offer(page)
         results.append("OASIS 60 i ISUNA 20000T mają dowód zgodności modeli. Częściowa wycena zachowuje otwarte wymaganie 2000 kW i odsyła do strony PDF.")
 
         page.set_viewport_size({"width": 375, "height": 812})
@@ -213,7 +231,7 @@ def audit(preview):
     assert not errors, errors
     assert not outside, outside
     report = {"commit": version, "browser": "Chromium", "scenarios": results,
-              "consoleErrors": errors, "externalRequests": outside}
+              "quotePdfPages": pdf_pages, "consoleErrors": errors, "externalRequests": outside}
     (ARTIFACTS / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

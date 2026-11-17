@@ -16,4 +16,4 @@ Sesja działa w przeglądarce. Dokumenty prywatne pozostają poza repozytorium i
 
 ## Powtórzenie odbioru
 
-Przy działającym serwerze uruchom `python scripts/acceptance.py` w środowisku z Playwright dla Pythona i Chromium. Skrypt sprawdza SHA z interfejsu, przechodzi formularze na danych syntetycznych, pobiera szkic i otwiera źródło PDF. Wyniki i zrzuty zapisuje w `output/acceptance/`. Tryb `--preview` służy do sprawdzania lokalnych zmian przed commitem. Stany formularza są przechowywane w pamięci karty. Użyj przycisku „Pobierz dane robocze”, aby zachować kopię na dysku.
+Przy działającym serwerze uruchom `python scripts/acceptance.py` w środowisku z Playwright dla Pythona, Chromium i PyMuPDF. Skrypt sprawdza SHA z interfejsu, przechodzi formularze na danych syntetycznych, pobiera szkic, otwiera źródło PDF i weryfikuje wydruk oferty. Wyniki i zrzuty zapisuje w `output/acceptance/`. Tryb `--preview` służy do sprawdzania lokalnych zmian przed commitem. Stany formularza są przechowywane w pamięci karty. Użyj przycisku „Pobierz dane robocze”, aby zachować kopię na dysku.
