@@ -64,6 +64,22 @@ test("powiązanie katalogowe udostępnia akcesorium do ręcznej weryfikacji", ()
   assert.equal("quantity" in accessories[0], false);
 });
 
+test("siedem odwołań bez kart pozostaje widocznymi identyfikatorami poza zestawieniem", () => {
+  const unit = catalog.byId["65576b5bfb92ae00136075d0"];
+  const unresolved = getAccessoryOptions(unit, catalog).filter(({ status }) => status === "outside-catalog");
+  assert.deepEqual(unresolved.map(({ id }) => id).sort(), [
+    "630837351f7b55001ad48ce6", "630837351f7b55001ad48cee", "630837351f7b55001ad48cf4",
+    "630837351f7b55001ad48cfa", "63a1642bdc00d2001a99d721", "63a1642bdc00d2001a99d722",
+    "63a1642bdc00d2001a99d727",
+  ]);
+  for (const entry of unresolved) {
+    assert.equal(entry.source, unit.source.url);
+    assert.equal(entry.product, null);
+    assert.equal("quantity" in entry, false);
+    assert.match(entry.model, /^CT1 \d+A\/5A/);
+  }
+});
+
 test("magazyn nie podstawia pojemności nominalnej w miejsce użytkowej ani mocy chwilowej w miejsce znamionowej", () => {
   const boundary = selectProducts("storage", withSources(storage), catalog);
   assert.equal(candidate(boundary, sunessId).status, "matches");
@@ -82,11 +98,18 @@ test("oddzielne porównanie falownika opiera się na znamionowej mocy czynnej AC
 });
 
 test("ISUNA 20000T porównuje napięcia międzyfazowe wymienione w karcie trybu on-grid", () => {
+  const input = getInputFields("inverter").find(({ id }) => id === "inverterVoltageV");
+  assert.match(input.label, /trybie sieciowym \(on-grid\)/);
+  assert.match(input.hint, /off-grid\) sprawdź ręcznie/);
+  const keh = catalog.products.find((product) => product.model === "SPI8K-B X2");
   for (const [inverterVoltageV, expected] of [[380, "matches"], [400, "matches"], [415, "matches"], [230, "fails"]]) {
     const result = selectProducts("inverter", withSources({ ...inverter, inverterVoltageV }), catalog);
     const voltage = check(result, isunaId, "nominalAcVoltageV");
     assert.equal(voltage.status, expected);
+    assert.match(voltage.label, /trybie sieciowym \(on-grid\)/);
     assert.match(voltage.sourceLabel, /międzyfazowe on-grid/);
+    assert.ok(result.checklist.some((item) => /off-grid\), sprawdź ręcznie/.test(item)));
+    assert.equal(check(result, keh.id, "nominalAcVoltageV").status, "manual");
   }
 });
 

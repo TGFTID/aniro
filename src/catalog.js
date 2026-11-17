@@ -137,8 +137,10 @@ function addFacts(product) {
     if (batterySupport?.kind === "boolean" && batterySupport.status === "parsed") {
       assign("batterySupported", batterySupport.value, batterySupport);
     }
-    const voltage = parameter("ZNAMIONOWE NAPIECIE WYJSCIOWE AC");
-    assign("nominalAcVoltageV", acVoltageFact(voltage), voltage);
+    if (product.subtype === "grid") {
+      const voltage = parameter("ZNAMIONOWE NAPIECIE WYJSCIOWE AC");
+      assign("nominalAcVoltageV", acVoltageFact(voltage), voltage);
+    }
   }
   if (product.kind === "compensator") {
     setNumber("ratedReactivePowerKvar", "MOC ZNAMIONOWA", "kvar");

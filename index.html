@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Katalog i roboczy dobór urządzeń Aniro">
+  <meta name="theme-color" content="#f5f6f8">
+  <link rel="icon" href="data:,">
+  <title>Aniro | Dobór urządzeń</title>
+  <link rel="stylesheet" href="./src/tokens.css">
+  <link rel="stylesheet" href="./src/styles.css">
+  <script type="module" src="./src/ui.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Przejdź do treści</a>
+  <header class="topbar">
+    <div class="shell brand-row">
+      <span class="brand"><span class="brand-mark" aria-hidden="true"></span>Aniro</span>
+      <span class="brand-section">Dobór urządzeń</span>
+    </div>
+  </header>
+
+  <main id="main" class="shell">
+    <header class="intro">
+      <div>
+        <h1>Dobór urządzeń dla obiektu</h1>
+        <p>Kompensacja mocy biernej, magazyny energii i falowniki z katalogu Aniro.</p>
+      </div>
+      <div class="circuit" aria-hidden="true"><span></span><span></span><span></span></div>
+    </header>
+
+    <div class="workspace">
+      <nav aria-label="Etapy doboru" class="workflow">
+        <ol>
+          <li><button type="button" data-step="1" aria-current="step"><span>1</span>Potrzeba</button></li>
+          <li><button type="button" data-step="2" disabled><span>2</span>Pomiary</button></li>
+          <li><button type="button" data-step="3" disabled><span>3</span>Warianty</button></li>
+          <li><button type="button" data-step="4" disabled><span>4</span>Oferta</button></li>
+        </ol>
+      </nav>
+
+      <div class="stage">
+        <p id="catalog-status" class="notice" role="status">Ładowanie katalogu Aniro…</p>
+        <noscript><p class="notice alert">Włącz JavaScript, aby wczytać katalog i przejść przez dobór.</p></noscript>
+        <section id="step-1" class="step" aria-labelledby="title-1">
+          <h2 id="title-1" tabindex="-1">Czego potrzebuje obiekt?</h2>
+          <p>Wybierz zadanie, aby zobaczyć wymagane dane.</p>
+          <div id="scenarios" class="choices"></div>
+          <div id="accessories"></div>
+        </section>
+
+        <section id="step-2" class="step" aria-labelledby="title-2" hidden>
+          <h2 id="title-2" tabindex="-1">Pomiary i wymagania</h2>
+          <p>Wpisz wartości i ich źródła. Źródłem może być pomiar z datą lub dokument i numer strony.</p>
+          <form id="measurements" novalidate>
+            <div id="fields" class="measurement-list"></div>
+            <div id="input-errors" class="notice alert" role="alert" hidden></div>
+            <div class="actions"><button type="submit" class="primary">Sprawdź dane i warianty</button><button type="button" data-save-draft>Pobierz dane robocze</button></div>
+          </form>
+        </section>
+
+        <section id="step-3" class="step" aria-labelledby="title-3" hidden>
+          <h2 id="title-3" tabindex="-1">Warianty i weryfikacja</h2>
+          <p>Porównaj parametry i wybierz pozycje do kalkulacji. Przed potwierdzeniem sprawdź montaż i zgodność.</p>
+          <div id="results"></div>
+          <div id="selected" tabindex="-1"></div>
+          <p id="selection-status" class="notice" role="status" hidden></p>
+          <div class="actions"><button id="go-terms" type="button" class="primary" disabled>Przejdź do warunków oferty</button><button type="button" data-save-draft>Pobierz dane robocze</button></div>
+        </section>
+
+        <section id="step-4" class="step" aria-labelledby="title-4" hidden>
+          <h2 id="title-4" tabindex="-1">Warunki oferty roboczej</h2>
+          <div id="scope-summary"></div>
+          <form id="terms-form">
+            <div class="form-grid">
+              <label for="scope">Zakres prac i dostawy</label>
+              <textarea id="scope" name="scope" rows="3" required></textarea>
+              <div class="columns">
+                <label>VAT (%)<input name="vatRate" type="number" min="0" max="100" step="any" required></label>
+                <label>Rabat na urządzenia (%)<input name="discountRate" type="number" min="0" max="100" step="any" required></label>
+              </div>
+              <div class="columns">
+                <label>Robocizna netto<input name="labour" type="number" min="0" step="0.01" required></label>
+                <label>Transport netto<input name="transport" type="number" min="0" step="0.01" required></label>
+              </div>
+              <label>Waluta robocizny i transportu
+                <select name="extrasCurrency" required>
+                  <option value="">Wybierz walutę</option><option>PLN</option><option>EUR</option><option>USD</option>
+                </select>
+              </label>
+              <p class="muted">Katalog nie potwierdza, czy ceny zawierają VAT.</p>
+              <label>Podstawa cen z katalogu
+                <select name="priceBasis" required>
+                  <option value="">Potwierdź sposób odczytania cen</option><option value="net">Ceny netto</option><option value="gross">Ceny brutto</option>
+                </select>
+              </label>
+              <label>Źródło potwierdzenia cen i warunków
+                <textarea name="commercialSource" required rows="2"></textarea>
+              </label>
+              <p class="muted">Kwoty są rozliczane oddzielnie w każdej walucie źródłowej.</p>
+            </div>
+            <div class="acceptance">
+              <div class="confirm"><label><input type="checkbox" name="technical" required> Potwierdzam dane wejściowe, podstawę ilości i przegląd ograniczeń technicznych.</label></div>
+              <div class="confirm"><label><input type="checkbox" name="commercial" required> Potwierdzam ceny, dostępność, zakres i pozostałe warunki handlowe.</label></div>
+            </div>
+            <p id="quote-error" class="notice alert" role="alert" hidden></p>
+            <div class="actions"><button type="submit" class="primary">Przygotuj ofertę roboczą</button><button type="button" data-save-draft>Pobierz dane robocze</button></div>
+          </form>
+          <section id="quote" class="quote" aria-labelledby="quote-title" hidden></section>
+        </section>
+      </div>
+    </div>
+
+    <footer class="footer"><span id="catalog-date">Katalog Aniro</span><nav aria-label="Dokumentacja"><a class="source-link" href="./docs/ANIRO-DATA-SOURCES.md">Źródła danych</a><a class="source-link" href="./docs/ANIRO-SELECTION-RULES.md">Zasady doboru</a></nav><span id="version"></span></footer>
+  </main>
+</body>
+</html>

@@ -1,9 +1,11 @@
+import { decodeDots } from "./catalog.js";
+
 export const SELECTION_RULES_VERSION = 1;
 
 export const SCENARIOS = [
   { id: "compensation", label: "Kompensacja mocy biernej", description: "Porównaj kompensatory na podstawie wymagań z pomiarów." },
   { id: "storage", label: "Magazyn energii", description: "Porównaj pojemność i znamionową moc baterii." },
-  { id: "inverter", label: "Falownik", description: "Porównaj znamionową moc AC i napięcie wyjściowe falownika." },
+  { id: "inverter", label: "Falownik", description: "Porównaj znamionową moc AC i napięcie znamionowe w trybie sieciowym." },
   { id: "storage-inverter", label: "Magazyn i falownik", description: "Porównaj urządzenia oraz udokumentowany zakres współpracy." },
   { id: "combined", label: "Rozwiązanie łączone", description: "Sprawdź wymagania dla kompensatora, magazynu i falownika." },
 ];
@@ -48,7 +50,7 @@ const storageFields = [
 
 const inverterFields = [
   numericField("acPowerKw", "Minimalna znamionowa moc wyjściowa AC", "kW", "Podaj wymaganą moc czynną pojedynczego falownika."),
-  numericField("inverterVoltageV", "Znamionowe napięcie AC dla falownika", "V", "Dla instalacji trójfazowej podaj wartość międzyfazową."),
+  numericField("inverterVoltageV", "Znamionowe napięcie AC falownika w trybie sieciowym (on-grid)", "V", "Dla instalacji trójfazowej podaj napięcie międzyfazowe. Napięcie wyjścia rezerwowego (off-grid) sprawdź ręcznie."),
 ];
 
 const inverterUses = [
@@ -65,7 +67,8 @@ const checklistByGroup = {
     "Sprawdź BMS, wariant, ograniczenia łączenia, zabezpieczenia, wymagania montażowe i zakres dostawy.",
   ],
   inverter: [
-    "Potwierdź konfigurację AC i warunki pracy. Jeśli urządzenie obsługuje PV, sprawdź osobno MPPT, prąd wejścia i prąd zwarciowy.",
+    "Potwierdź znamionowe napięcie AC i warunki pracy w trybie sieciowym. Jeśli potrzebujesz zasilania rezerwowego (off-grid), sprawdź ręcznie jego napięcie, moc i sposób przełączania.",
+    "Jeśli urządzenie obsługuje PV, sprawdź osobno MPPT, prąd wejścia i prąd zwarciowy.",
     "Sprawdź wymagane certyfikaty, funkcje sterowania, limity mocy, wyposażenie, zabezpieczenia i zgodność wersji.",
   ],
 };
@@ -204,23 +207,35 @@ function inverterChecks(product, values) {
     { field: "inverterUse", label: "Rodzaj falownika", status: product.subtype === use ? "matches" : "fails",
       reason: "Kategoria katalogowa: " + (product.category[2] ?? "brak") + ".", source: product.source.url ?? null },
     minimum(product, "nominalAcPowerKw", "Znamionowa moc wyjściowa AC", values.acPowerKw.value, "kW"),
-    compare(product, "nominalAcVoltageV", "Znamionowe napięcie wyjściowe AC", (supported) => supported.includes(voltage), (supported, matches) =>
-      "Obiekt " + format(voltage, "V") + ", urządzenie " + supported.map(renderNumber).join(" / ") + " V AC"
+    compare(product, "nominalAcVoltageV", "Znamionowe napięcie AC w trybie sieciowym (on-grid)", (supported) => supported.includes(voltage), (supported, matches) =>
+      "Obiekt " + format(voltage, "V") + ", urządzenie w trybie sieciowym " + supported.map(renderNumber).join(" / ") + " V AC"
         + (matches ? " – napięcie występuje w wykazie." : " – napięcia brak w wykazie."),
-    "Brak porównywalnego napięcia AC z potwierdzonym odniesieniem międzyfazowym."),
+    "Źródło nie podaje porównywalnego znamionowego napięcia AC w trybie sieciowym."),
   ];
 }
 
 const checksByGroup = { compensator: compensatorChecks, storage: storageChecks, inverter: inverterChecks };
 
 export function getAccessoryOptions(product, catalog) {
-  const ids = new Set((product.associatedProducts ?? []).map(({ id }) => id));
-  return [...ids].map((id) => catalog.byId[id]).filter((item) => item?.kind === "accessory").map((accessory) => ({
-    product: accessory,
-    status: "manual",
-    source: product.source.url ?? null,
-    reason: "Powiązanie w katalogu. Potwierdź zgodność, potrzebę, wariant i ilość w projekcie.",
-  }));
+  const references = new Map((product.associatedProducts ?? []).map((entry) => [entry.id, entry]));
+  const source = product.source?.url ?? null;
+  const options = [];
+  for (const [id, reference] of references) {
+    if (!id) continue;
+    const accessory = catalog.byId[id];
+    if (accessory?.kind === "accessory") {
+      options.push({
+        product: accessory, status: "manual", source,
+        reason: "Powiązanie w katalogu. Potwierdź zgodność, potrzebę, wariant i ilość w projekcie.",
+      });
+    } else if (!accessory) {
+      options.push({
+        id, model: decodeDots(reference.type) || id, product: null, status: "outside-catalog", source,
+        reason: "Powiązanie bez pełnej karty w migawce. Zweryfikuj wariant i zgodność u Aniro.",
+      });
+    }
+  }
+  return options;
 }
 
 export function evaluateCompatibility(storage, inverter, catalog) {

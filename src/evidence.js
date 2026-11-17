@@ -91,7 +91,7 @@ function largeIsunaFacts(model) {
   const acSource = isunaCertificate + ', s. 3, A.2'
   return [
     fact('Znamionowa moc czynna AC', model.power + ' kW', acSource, 'nominalAcPowerKw'),
-    fact('Napięcie międzyfazowe wyjścia AC przy nastawach dla Polski, 50 Hz', '400 V AC', acSource, 'nominalAcVoltageV'),
+    fact('Napięcie międzyfazowe on-grid przy nastawach dla Polski, 50 Hz', '400 V AC', acSource, 'nominalAcVoltageV'),
     fact('Wyjście AC objęte certyfikatem', '230/400 V, 3L + N + PE, 50 Hz; maks. ' + model.maxOutputA + ' A i ' + model.apparentKva + ' kVA', acSource),
     fact('Wejście PV objęte certyfikatem', 'Maks. 1000 V; MPPT 150–850 V; maks. prądy wejścia ' + model.pvInputA + ' A; maks. prądy zwarciowe ' + model.pvShortCircuitA + ' A', dcSource),
     fact('Wejście baterii objęte certyfikatem', '140–800 V; maks. ładowanie 80 / 80 A; maks. rozładowanie 80 / 80 A; litowa, kwasowo-ołowiowa lub sodowa', dcSource),

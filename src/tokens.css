@@ -1,0 +1,200 @@
+/* =============================================================================
+   tokens.css — KANONICZNE TOKENY WIZUALNE dla wszystkich apek
+   D:\6 APK APP TRL UP\API OVH Coolify Skill\skille\design-system\tokens.css
+
+   Jedyne źródło prawdy dla koloru, typografii, odstępów, promieni, cienia i ruchu.
+   Kopiuj ten plik do nowej apki i podłącz jako pierwszy arkusz. Nie wymyślaj palety
+   od zera i nie dopisuj lokalnych hexów obok — jeśli czegoś brakuje, dopisz token TUTAJ.
+
+   POCHODZENIE WARTOŚCI (nic nie jest wymyślone od zera):
+   - kolory, cień, font        → authjs-coolify-starter/app/globals.css (produkcja)
+   - skala odstępów            → teovia (najbardziej kompletna z 4 apek)
+   - promienie                 → authjs + logowanie/web (zgodne 12–14px)
+   - ruch                      → wzorce z Przystań (chill/supablo)
+
+   DOSTĘPNOŚĆ: każdy kolor tekstu przeliczony względem WSZYSTKICH TRZECH teł
+   (--bg, --surface, --surface-2) w OBU motywach. Minimum WCAG AA: 4.5:1 tekst,
+   3:1 granice interaktywne. Pięć wartości świadomie skorygowano wobec źródeł
+   produkcyjnych, bo nie przechodziły na wszystkich tłach:
+     --danger        #d92d20 → #d02c1f   (było 4.47:1, teraz 4.56:1)
+     --success       #1a7f4b → #1a7d4a   (było 4.43:1, teraz 4.55:1)
+     --warning       #b45309 → #b25209   (było 4.43:1, teraz 4.52:1)
+     --border-strong #8a94a3 → #818c9c   (było 2.84:1, teraz 3.01:1)
+     --accent-hover (ciemny) #3b82f6 → #125bcd (biały tekst miał 3.68:1, ma 6.17:1)
+   Podane wartości to najgorszy przypadek z trzech teł. W obu motywach hover
+   POGŁĘBIA akcent — rozjaśnianie w ciemnym motywie psuje czytelność białego tekstu.
+
+   Ikony: Tabler webfont, wersja przypięta —
+   https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.46.0/dist/tabler-icons.min.css
+   ============================================================================= */
+
+:root {
+  /* --- kolor: powierzchnie --------------------------------------------- */
+  --bg: #f5f6f8;              /* tło strony */
+  --surface: #ffffff;         /* karta, panel, pole formularza */
+  --surface-2: #eef1f5;       /* wgłębienie, wiersz po najechaniu, pasek postępu */
+
+  /* --- kolor: treść ----------------------------------------------------- */
+  --text: #191c22;            /* najgorszy 15.06:1 (na --surface-2) */
+  --text-2: #5c6470;          /* najgorszy  5.28:1 (na --surface-2) */
+
+  /* --- kolor: linie ------------------------------------------------------ */
+  --border: #e3e7ec;          /* hairline dekoracyjny — NIE dla granic pól */
+  --border-strong: #818c9c;   /* granica elementu interaktywnego, najgorszy 3.01:1 */
+
+  /* --- kolor: akcent ----------------------------------------------------- */
+  --accent: #2563eb;          /* biały tekst na akcencie = 5.17:1 */
+  --accent-hover: #1d4ed8;
+  --accent-ink: #ffffff;      /* tekst i ikona NA wypełnionym akcencie */
+  --accent-text: #2563eb;     /* akcent JAKO kolor tekstu na tle, najgorszy 4.56:1 */
+
+  /* --- kolor: stany ------------------------------------------------------ */
+  --danger: #d02c1f;          /* najgorszy 4.56:1 | biały tekst na nim 5.17:1 */
+  --success: #1a7d4a;         /* najgorszy 4.55:1 */
+  --warning: #b25209;         /* najgorszy 4.52:1 */
+
+  /* --- kolor: warstwy ---------------------------------------------------- */
+  --overlay: rgba(15, 23, 32, .45);   /* scrim pod modalem i szufladą */
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05);   /* JEDYNY dopuszczalny cień */
+
+  /* --- typografia -------------------------------------------------------- */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  /* system-ui świadomie: działa offline, zero CDN, zero skoku układu przy ładowaniu */
+
+  --fs-h1: 22px;   --lh-h1: 1.25;   --fw-h1: 700;
+  --fs-h2: 18px;   --lh-h2: 1.3;    --fw-h2: 700;
+  --fs-body: 16px; --lh-body: 1.5;  --fw-body: 400;
+  --fs-label: 14px; --lh-label: 1.4; --fw-label: 600;
+  --fs-small: 13px; --lh-small: 1.4;
+  /* 16px na polach formularza jest obowiązkowe — mniejsza wartość powoduje
+     automatyczne przybliżenie strony na iOS Safari przy wejściu w pole.
+     --fs-small NIE może być jedynym nośnikiem ważnej informacji. */
+
+  /* --- odstępy (skala 4) -------------------------------------------------- */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;  --space-7: 32px;  --space-8: 40px;
+
+  /* --- promienie ---------------------------------------------------------- */
+  --radius-sm: 12px;      /* pole formularza, przycisk */
+  --radius: 14px;         /* karta, panel */
+  --radius-pill: 999px;   /* pigułka, tag, odznaka */
+
+  /* --- układ --------------------------------------------------------------- */
+  --tap-min: 48px;        /* minimalny cel dotyku — powyżej progu WCAG 44px */
+  --content-max: 520px;   /* maksymalna szerokość kolumny treści */
+  --nav-h: 64px;          /* wysokość dolnego paska nawigacji */
+  --bp-tablet: 640px;
+  --bp-desktop: 1024px;
+
+  /* --- warstwy ------------------------------------------------------------- */
+  --z-nav: 100;  --z-drawer: 200;  --z-modal: 300;  --z-toast: 400;
+
+  /* --- ruch ---------------------------------------------------------------- */
+  --ease-out: cubic-bezier(.4, 0, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(.16, 1, .3, 1);
+  --dur-micro: 100ms;    /* naciśnięcie przycisku */
+  --dur-fast: 150ms;     /* hover, zmiana koloru */
+  --dur-screen: 220ms;   /* przejście ekranu */
+  --dur-modal: 260ms;    /* wjazd modalu / szuflady */
+  --dur-exit: 180ms;     /* zamknięcie — zawsze szybsze niż otwarcie */
+  /* Żadna animacja interfejsu nie przekracza 300ms. */
+
+  /* --- focus ---------------------------------------------------------------- */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* =============================================================================
+   MOTYW CIEMNY
+   Podstawą jest ustawienie systemowe. Blok jest zabezpieczony przed nadpisaniem,
+   gdy apka daje własny przełącznik i użytkownik wybrał jasny.
+   ============================================================================= */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216;
+    --surface: #171b21;
+    --surface-2: #1e242c;
+
+    --text: #eceff3;          /* najgorszy 13.55:1 (na --surface-2) */
+    --text-2: #9aa4b2;        /* najgorszy  6.20:1 (na --surface-2) */
+
+    --border: #272d36;
+    --border-strong: #6b7280; /* najgorszy 3.23:1 */
+
+    --accent: #1f6feb;        /* biały tekst 4.63:1, na hover 6.17:1 */
+    --accent-hover: #125bcd;
+    --accent-ink: #ffffff;
+    --accent-text: #4889ef;   /* jaśniejszy niż --accent: jako tekst musi mieć 4.5:1 */
+
+    --danger: #ff6b60;        /* najgorszy 5.60:1 */
+    --success: #6db96b;       /* najgorszy 6.55:1 */
+    --warning: #d97706;       /* najgorszy 4.90:1 */
+
+    --overlay: rgba(0, 0, 0, .6);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+}
+
+/* Ręczny przełącznik motywu — opcjonalny. Apka bez przełącznika po prostu
+   nie ustawia data-theme i działa wyłącznie na ustawieniu systemowym. */
+:root[data-theme="dark"] {
+  --bg: #0f1216;
+  --surface: #171b21;
+  --surface-2: #1e242c;
+  --text: #eceff3;
+  --text-2: #9aa4b2;
+  --border: #272d36;
+  --border-strong: #6b7280;
+  --accent: #1f6feb;
+  --accent-hover: #125bcd;
+  --accent-ink: #ffffff;
+  --accent-text: #4889ef;
+  --danger: #ff6b60;
+  --success: #6db96b;
+  --warning: #d97706;
+  --overlay: rgba(0, 0, 0, .6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+/* =============================================================================
+   MINIMUM, KTÓRE MUSI OBOWIĄZYWAĆ ZAWSZE
+   ============================================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;             /* poziome przewijanie to zawsze błąd układu */
+}
+
+img, svg, video { max-width: 100%; height: auto; }
+
+/* Widoczny focus klawiatury jest nieusuwalny. Jeśli gdzieś potrzebny jest inny
+   wygląd — zmień wygląd, nigdy nie usuwaj wskazania. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Każdy element interaktywny ma pełnowymiarowy cel dotyku. */
+button, a[role="button"], [role="tab"], input[type="checkbox"], input[type="radio"] {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

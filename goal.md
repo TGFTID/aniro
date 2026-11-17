@@ -38,3 +38,9 @@ Dowody techniczne pochodzą z migawki Aniro i dostarczonych publicznych kart. EM
 ## Rollback
 
 Zatrzymanie serwera uruchomionego dla tego repo kończy sesję aplikacji. Poprzednią zatwierdzoną wersję można otworzyć w osobnym worktree, odbudować i uruchomić lokalnie. Starsza kopia referencyjna i pakiet źródłowy są niezależne od nowego repo.
+
+## Wynik integracji
+
+Model obejmuje 55 kompensatorów, 35 falowników, 17 magazynów i 5 akcesoriów. Porównano 112 ID i 1792 pola ze źródłowym JSON, odczytano 15 stron publicznych PDF oraz sprawdzono 12 sum manifestu. Dziesięć wykrytych konfliktów harmonicznych kieruje porównanie spornego pola do ręcznej oceny. Lista 21 par dotyczy konkretnych modeli magazynów i falowników. Ręczna adnotacja operatora pozostawia brakujący parametr otwarty w wycenie częściowej i wydruku.
+
+Wycena operuje oddzielnie w walutach źródłowych. Każda z 99 dodatnich cen przechodzi sprawdzenie odtworzenia ceny brutto przy braku rabatu i kosztów. Pozostałe 13 pozycji wymaga potwierdzonej dodatniej ceny. Weryfikację techniczną i handlową pokrywa 29 testów jednostkowych. Odbiór przeglądarkowy zapisuje faktyczny SHA i listę wykonanych scenariuszy w `output/acceptance/report.json`.
