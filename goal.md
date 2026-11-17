@@ -1,0 +1,40 @@
+# Aniro · plan i kryteria odbioru
+
+## Cel i baza
+
+Operator wprowadza dane techniczne z jednostką i pochodzeniem, porównuje udokumentowane parametry, wskazuje wariant i po akceptacji otwiera roboczą ofertę. Zakres obejmuje kompensację, magazyny, falowniki i ocenę rozwiązań łączonych.
+
+17.11.2026, katalog wskazany przez właściciela. W rejestrze APKI brak wpisu, STAN §3 odnotowuje poprzedni blok danych. W drzewie projektu brak repozytorium Git, wyszukiwanie nazw na koncie TGFTID nie wskazało repozytorium Aniro. Nowe, odizolowane repo aniro-app, gałąź main, bez remote. Poziom wyżej pozostają materiały pierwotne i aplikacja referencyjna.
+
+## Kontrakty i własność
+
+| Blok | Pliki | Odpowiedzialność |
+|---|---|---|
+| Źródła | evidence/, docs/ANIRO-DATA-SOURCES.md, docs/ANIRO-SELECTION-RULES.md, src/evidence.js | Weryfikacja stron PDF, zgodności, rozbieżności oraz źródeł poszczególnych reguł |
+| Dane i dobór | data/catalog.json, src/catalog.js, src/selection.js | 112 źródłowych ID, oddzielne modele produktów, surowe pole, jednostka, zakres i status, osobne filtry i jawne ograniczenia |
+| Interfejs | index.html, src/ui*.js, src/*.css | Cel, dane i ich pochodzenie, braki, porównanie, kompletacja, warunki i oferta. Zmiana wejść unieważnia akceptację |
+| Wycena | src/pricing.js | Wejścia użytkownika dla ilości, podstawy ceny, VAT, rabatu, robocizny, transportu i zakresu. Podsumowania w walutach źródłowych |
+| Integracja | scripts/, package.json, tests/, goal.md, README.md | Testy regresji, build, uruchomienie i odbiór w rzeczywistej przeglądarce |
+
+Dowody techniczne pochodzą z migawki Aniro i dostarczonych publicznych kart. EML i formularz PPE odczytywane lokalnie. Ich treść i identyfikatory nie trafiają do repo ani do aplikacji. Akcesorium potrzebuje powiązania o udokumentowanym znaczeniu. Dokument zgodności sieciowej ma zakres opisany w certyfikacie. Gdy brakuje reguły lub źródła, pozostaje porównanie ręczne. Katalog, PDF i aplikacja działają lokalnie. Odnośnik do karty online otwiera się na życzenie użytkownika.
+
+## Kolejność i wykonawcy
+
+1. Inwentaryzacja, odczyt STAN i manifestu, rozpoznanie Git i odizolowanie nowej aplikacji.
+2. Równolegle przegląd dowodów, model/filtry i interfejs. Natywni wykonawcy GPT-6.2 Sol mają świeże konteksty i rozłączne pliki. Wybór z 17.11.2026 odpowiada preferencji oszczędnego modelu. Większy wysiłek rozumowania przy odczycie wielojęzycznych tabel. Bez płatnego API. Po dwóch nieudanych próbach diagnoza i zmiana metody.
+3. Integracja dowodów w filtrach i UI, osobna kalkulacja handlowa, weryfikacja niezależnymi przykładami. Migawka z 17.11.2026 nie przesądza o aktualnym stanie handlowym.
+4. Testy, kontrola plików, niezależny przegląd. Commit tylko sprawdzonych plików.
+5. Świeży build, identyfikacja SHA w interfejsie, scenariusze w przeglądarce, audyt ekranów. Lokalnie uruchomiony serwer na adresie pętli zwrotnej.
+
+## Testy i DONE
+
+- Kontrola 112 unikalnych rekordów, 12 skrótów manifestu, sześciu kopii PDF w ZIP i stron użytych w regułach.
+- Parser dla jednostek, zakresów, braków, znaczników i tekstu. Konflikty wyłączają odpowiedni filtr. Brak opisu i brak parametrów zachowują swoje znaczenie.
+- Dobór dla pomiarów granicznych, braku źródła, niezgodności i różnych wariantów oznaczenia. Niedokumentowana para lub ilość nie staje się kompletem.
+- Przykłady z niezależnym wynikiem dla obliczeń. Odrębne waluty i jawna podstawa cen. Brak potwierdzenia blokuje ofertę.
+- Rzeczywiste kliknięcia w scenariuszach kompensacji, falownika/magazynu, braków i konfliktu. Kontrola kompletacji i wyjściowej oferty. Audyt responsywności, obu motywów, dostępności i błędów.
+- Przeszukanie nowego repo i świeżego buildu pod kątem dawnej marki. Dokładny hash w odebranym UI. Zgodnie ze zleceniem wynik jest lokalny.
+
+## Rollback
+
+Zatrzymanie serwera uruchomionego dla tego repo kończy sesję aplikacji. Poprzednią zatwierdzoną wersję można otworzyć w osobnym worktree, odbudować i uruchomić lokalnie. Starsza kopia referencyjna i pakiet źródłowy są niezależne od nowego repo.
