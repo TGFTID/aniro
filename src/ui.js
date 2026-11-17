@@ -43,12 +43,15 @@ function sourceLink(url, label) {
   return '';
 }
 
-function pdfLinks(source) {
+function sourceReference(source) {
   if (typeof source !== 'string') return '';
-  return source.split(/; | · /).map(sourcePdf).filter(Boolean).map(({ file, page }) =>
-    '<a class="source-link" href="./evidence/' + encodeURIComponent(file) + '#page=' + page
-    + '" target="_blank" rel="noopener noreferrer">' + text(file + ', s. ' + page) + '</a>'
-  ).join('');
+  return source.split(/(; | · )/).map((segment) => {
+    const reference = sourcePdf(segment);
+    if (!reference) return text(segment);
+    const { file, page } = reference;
+    return '<a class="source-link" href="./evidence/' + encodeURIComponent(file) + '#page=' + page
+      + '" target="_blank" rel="noopener noreferrer">' + text(segment) + '</a>';
+  }).join('');
 }
 
 function productSource(product) {
@@ -196,7 +199,7 @@ function unresolvedRequirements(lines, forOffer = false) {
         const requirement = input && field ? '<dl class="specs"><div><dt>Wymaganie obiektu</dt><dd>'
           + text(value) + (field.unit ? ' ' + text(field.unit) : '')
           + '<br><span class="meta">' + text(input.source) + '</span></dd></div></dl>' : '';
-        const proof = check.source ? '<p class="source-info">' + text(check.source) + '</p>' + pdfLinks(check.source)
+        const proof = check.source ? '<p class="source-info">' + sourceReference(check.source) + '</p>'
           : '<p class="source-info">W źródłach urządzenia brak porównywalnej wartości.</p>';
         return '<li><strong>' + text(check.label) + '</strong><p>' + text(check.reason) + '</p>' + requirement + proof + '</li>';
       }).join('')
@@ -217,7 +220,7 @@ function productDetails(product, checks) {
   const pdfFacts = (product.pdfFacts ?? []).map((fact) =>
     '<div><dt>' + text(fact.label) + '</dt><dd>' + text(fact.value)
       + (fact.status === 'requires-review' ? '<br><strong class="grade manual">Do weryfikacji</strong>' : '')
-      + '<br><span class="meta source-info">' + text(fact.source) + '</span>' + pdfLinks(fact.source)
+      + '<br><span class="meta source-info">' + sourceReference(fact.source) + '</span>'
       + '</dd></div>'
   ).join('');
   return (conflicts.length ? '<div class="notice alert"><strong>Rozbieżność w źródle</strong>' + list(conflicts) + '</div>' : '')
@@ -225,7 +228,7 @@ function productDetails(product, checks) {
     + '<ul class="inline-list">' + checks.map((check) => '<li><strong>' + text(check.label) + '</strong> '
       + '<span class="grade ' + text(check.status) + '">' + text(statusLabels[check.status]) + '</span><br>' + text(check.reason)
       + (check.raw ? '<br><span class="meta">' + text([check.sourceLabel, check.raw].filter(Boolean).join(' / ')) + '</span>' : '')
-      + (check.source ? '<br><span class="meta source-info">' + text(check.source) + '</span>' + pdfLinks(check.source) : '') + '</li>').join('') + '</ul>'
+      + (check.source ? '<br><span class="meta source-info">' + sourceReference(check.source) + '</span>' : '') + '</li>').join('') + '</ul>'
     + parameterDetails(product)
     + (pdfFacts ? '<h4>Udokumentowane dane techniczne</h4><dl class="specs">' + pdfFacts + '</dl>' : '')
     + (missing.length ? '<h4>Braki karty</h4>' + list(missing) : '')
@@ -408,7 +411,7 @@ function showPair(pair) {
     + '<p>' + text(pair.reason) + '</p>'
     + (pair.status === 'documented' ? '<p>Zakres dokumentu obejmuje modele. Moc, pojemność i konfiguracja obiektu wymagają osobnego sprawdzenia.</p>' : '')
     + (pair.scope ? '<p>' + text(pair.scope) + '</p>' : '')
-    + (pair.source ? '<p class="source-info">' + text(pair.source) + '</p>' : '') + pdfLinks(pair.source) + '</div>';
+    + (pair.source ? '<p class="source-info">' + sourceReference(pair.source) + '</p>' : '') + '</div>';
 }
 
 function renderSelected() {
