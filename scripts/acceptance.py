@@ -68,6 +68,7 @@ def check_width(page, stage):
 
 
 def quick_field(page, name):
+    page.locator("#quick-start:not([inert])").wait_for(state="attached")
     return page.locator(f'#quick-start [name="{name}"]')
 
 
@@ -290,6 +291,7 @@ def start_invoice(page, origin, screen=None):
     quick_field(page, "reactiveFee").fill("250")
     quick_field(page, "billTotal").fill("1200")
     quick_installed(page, "no")
+    quick_kind(page,"compensator").check()
     if screen:
         capture(page, screen, "invoice", "#quick-start")
     page.locator("#quick-start-invoice").click()
@@ -479,7 +481,12 @@ def check_only_power(page, origin):
 
 def check_only_amounts(page, origin):
     save_partial_start(page, origin, "reactiveFee", "250")
-    expect(page.locator(".quick-suggestion")).to_contain_text("kompensator")
+    expect(page.locator(".quick-suggestion")).to_contain_text("magazyn")
+    page.locator("#quick-start-next").click()
+    assert_three_models(page)
+    page.locator("[data-edit]").click()
+    quick_kind(page,"inverter").uncheck()
+    quick_kind(page,"storage").uncheck()
     open_questionnaire(page)
     expect_question(page, "inverters")
     enter_field(page, "siteInverters", "no")
@@ -491,12 +498,13 @@ def check_only_amounts(page, origin):
     expect(page.locator("#groups > section > h3")).to_have_text(["Kompensatory"])
 
     save_partial_start(page, origin, "billTotal", "1200")
-    expect(page.locator(".quick-suggestion")).to_be_hidden()
+    expect(page.locator(".quick-suggestion")).to_contain_text("falownik")
     page.locator("#quick-start-next").click()
-    expect(page.locator("#first-offer")).to_be_visible()
-    expect(page.locator("#first-offer select")).to_have_count(3)
+    assert_three_models(page)
+    page.locator("[data-benefits]").click()
+    page.locator('[data-benefit-tab="solar"]').click()
     solar = page.locator("#first-offer .offer-benefits details").last
-    solar.locator("summary").click()
+    expect(solar).to_have_attribute("open", "")
     for name, value in {"avoided":"200","tariff":"1,10","lostRevenue":"20"}.items():
         solar.locator(f'[name="{name}"]').fill(value)
     assert compact(solar.locator("[data-solar-total]").inner_text()) in ("200zł","200,00zł")
@@ -504,20 +512,32 @@ def check_only_amounts(page, origin):
     assert compact(solar.locator("[data-solar-total]").inner_text()) in ("2400zł","2400,00zł")
 
 
+def assert_three_models(page):
+    offer = page.locator("#first-offer")
+    expect(offer).to_be_visible()
+    expect(offer.locator("[data-model]")).to_have_count(3)
+    for kind in ("inverter","storage","compensator"):
+        selected = offer.locator(f'[data-model="{kind}"]')
+        assert selected.input_value(), kind
+        expect(offer.locator(f'[data-price="{kind}"]')).to_contain_text(re.compile("[0-9]"))
+        expect(selected).to_be_in_viewport(ratio=1)
+    expect(offer.locator("[data-benefits]")).to_be_in_viewport(ratio=1)
+
+
 def check_first_offer_benefits(page, origin, screen):
     page.goto(origin)
     quick_field(page, "billTotal").fill("48000")
     quick_field(page, "reactiveFee").fill("7200")
     page.locator('[name="billingPeriod"][value="year"]').check()
-    quick_kind(page,"compensator").check()
-    page.locator("#quick-start-next").click()
+    page.locator("#quick-start-invoice").click()
+    assert_three_models(page)
     offer = page.locator("#first-offer")
     expect(offer).to_be_visible()
     expect(page.locator("#measurements")).to_be_hidden()
     pick = offer.locator("[data-model=compensator]")
     ids = pick.locator("option").evaluate_all("rows => rows.map(row=>row.value).filter(Boolean)")
     assert len(ids)>1
-    pick.select_option(ids[-1])
+    pick.select_option(ids[1])
     capture(page,screen,"initial-offer","#first-offer")
     offer.locator("[data-benefits]").click()
     expect(offer.locator("[data-info]")).to_contain_text("roczna")
@@ -530,13 +550,13 @@ def check_first_offer_benefits(page, origin, screen):
     range_control.press("End")
     offer.locator(".benefit-cost input").first.fill("3600")
     expect(offer.locator("[data-return]")).to_contain_text("6 mies.")
-    capture(page,screen,"benefits","#first-offer .offer-benefits > .benefit",align=True)
+    capture(page,screen,"benefits","#first-offer [data-fee-box] .benefit",align=True)
     page.locator("[data-save-case]").click()
     row = page.locator("#saved-cases [data-resume-case]").first
     row_id=row.get_attribute("data-resume-case")
     page.reload()
     page.locator(f'[data-resume-case="{row_id}"]').click()
-    expect(pick).to_have_value(ids[-1])
+    expect(pick).to_have_value(ids[1])
     offer.locator("[data-benefits]").click()
     expect(offer.locator(".benefit-cost input").first).to_have_value("3600")
     check_width(page, "oferta i korzyści")
@@ -559,6 +579,13 @@ def check_existing_inverter(page, origin):
     expect_question(page, "capacityBasis")
     enter_measurements(page, {"capacityBasis": "nominal", "storagePowerKw": "10"})
     expect(page.locator("#groups > section > h3")).to_have_text(["Magazyny energii"])
+    page.locator('[data-step="1"]').click()
+    page.locator("#quick-start-next").click()
+    expect(page.locator("#first-offer [data-model]")).to_have_count(1)
+    page.locator('[data-add-kind="inverter"]').click()
+    expect(page.locator('[data-model="inverter"]')).to_be_visible()
+    page.locator('[data-add-kind="compensator"]').click()
+    assert_three_models(page)
 
 
 def check_group_scope(page, origin):

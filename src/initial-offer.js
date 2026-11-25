@@ -37,28 +37,39 @@ export function alternatives(catalog, kind, data) {
 }
 
 export function renderInitialOffer(host, catalog, data, prefs, handlers) {
-  const groups = data.kinds.filter(kind => categories[kind]).map(kind => ({kind, ...categories[kind], products:alternatives(catalog,kind,data)}));
-  const controls = groups.map(({kind,label,unit,field,input,products}) => {
-    const requested = number(data[input]);
+  const groups = Object.keys(categories).filter(kind => data.kinds.includes(kind)).map(kind => ({kind, ...categories[kind], products:alternatives(catalog,kind,data)}));
+  const controls = groups.map(({kind,label,unit,field,products}) => {
     const options = products.map(p => '<option value="'+escape(p.id)+'">'+escape(p.model)+' · '+escape(p.facts[field].value)+' '+unit+'</option>').join('');
-    const reason = kind === 'compensator' ? 'Model przykładowy. Wymaganą moc w kvar ustali pomiar.' : requested ?
-      'Na podstawie podanych '+escape(requested)+' '+unit+'.' : 'Model przykładowy do porównania cen.';
-    return '<section class="offer-row"><img src="./src/quick-'+kind+'.png" alt=""><div><label>'+label+
-      '<select data-model="'+kind+'"><option value="">Pomiń tę pozycję</option>'+options+'</select></label><small>'+reason+'</small></div><div class="offer-price" data-price="'+kind+'"></div></section>';
+    return '<section class="offer-row"><img src="./src/quick-'+kind+'.png" alt=""><div class="offer-heading">'+
+      '<label for="offer-'+kind+'">'+label+'</label><strong data-price="'+kind+'"></strong></div>'+
+      '<select id="offer-'+kind+'" data-model="'+kind+'"><option value="">Pomiń tę pozycję</option>'+options+'</select></section>';
   }).join('');
-  host.innerHTML='<div class="early-head"><h2 tabindex="-1">Twoja oferta wstępna</h2><p>Możesz zmienić model lub pominąć pozycję. Ceny jednostkowe z katalogu Aniro z '+escape(catalog.snapshotDate)+'.</p></div>'+
-    controls+'<p data-pair-note class="muted"></p><p class="muted">Podstawa VAT i dostępność do potwierdzenia przed zakupem.</p>'+
+  const remaining = Object.keys(categories).filter(kind => !data.kinds.includes(kind));
+  const addNames = {inverter:'falownik',storage:'magazyn',compensator:'kompensator'};
+  const extra = remaining.map(kind => '<button type="button" data-add-kind="'+kind+'">+ Dodaj '+addNames[kind]+'</button>').join('');
+  const notes = groups.map(({kind,label,unit,input}) => {
+    const target = number(data[input]);
+    const reason = kind === 'compensator' ? 'Wymaganą moc w kvar ustali pomiar.' : target ? 'Podana wartość: '+escape(target)+' '+unit+'.' : 'Przykładowy model do porównania cen.';
+    return '<p><strong>'+label+'</strong> · '+reason+' <span data-source="'+kind+'"></span></p>';
+  }).join('');
+  host.innerHTML='<div class="early-head"><h2 tabindex="-1">Twoja oferta wstępna</h2><p>Przykładowe modele Aniro. Zmień model lub pomiń pozycję.</p></div>'+
+    '<div class="offer-list">'+controls+'</div>'+(extra ? '<div class="offer-add">'+extra+'</div>' : '')+
     '<div class="early-actions"><button type="button" class="primary" data-benefits>Zobacz korzyści ↓</button><button type="button" data-edit>Zmień dane</button></div>'+
-    '<div class="offer-benefits"></div><div class="early-actions"><button type="button" data-details>Doprecyzuj dobór i przygotuj wydruk</button><button type="button" data-help>Nie wiem · poproś elektryka</button></div>';
+    '<div class="offer-benefits" hidden><div class="benefit-tabs" role="group" aria-label="Korzyści urządzeń"><button type="button" data-benefit-tab="fee">Kompensator</button><button type="button" data-benefit-tab="solar">Falownik i magazyn</button></div><div data-fee-box></div><div data-solar-box></div></div>'+
+    '<details class="offer-notes"><summary>Ceny, dobór i karty katalogowe</summary><p>Ceny za sztukę z '+escape(catalog.snapshotDate)+'. Podstawa VAT i dostępność do potwierdzenia przed zakupem.</p>'+notes+'<p data-pair-note></p></details>'+
+    '<div class="early-actions supplemental"><button type="button" data-details>Doprecyzuj dobór i przygotuj wydruk</button><button type="button" data-help>Nie wiem · poproś elektryka</button></div>';
+  for (const button of host.querySelectorAll('[data-add-kind]')) button.onclick = () => handlers.addKind(button.dataset.addKind);
   const choices = {...prefs.choices};
   function refresh() {
     for (const {kind,products} of groups) {
       const product = products.find(p => p.id === choices[kind]);
       const box = host.querySelector('[data-price="'+kind+'"]');
       box.textContent = product ? unitPrice(product)+' / szt.' : products.length ? 'Pominięto' : 'Brak modelu o potwierdzonych parametrach';
+      const source = host.querySelector('[data-source="'+kind+'"]');
+      source.replaceChildren();
       if (product) {
         const link = document.createElement('a'); link.textContent='Karta Aniro ↗';
-        link.href='https://katalog.aniro.pl/product/'+encodeURIComponent(product.id)+'/'; link.target='_blank'; link.rel='noopener'; box.append(link);
+        link.href='https://katalog.aniro.pl/product/'+encodeURIComponent(product.id)+'/'; link.target='_blank'; link.rel='noopener'; source.append(link);
       }
     }
     const a=catalog.byId[choices.storage], b=catalog.byId[choices.inverter];
@@ -71,20 +82,31 @@ export function renderInitialOffer(host, catalog, data, prefs, handlers) {
     choices[kind]=select.value; select.onchange=()=>{choices[kind]=select.value;refresh();};
   }
   refresh();
-  const benefits = mountBenefits(host.querySelector('.offer-benefits'),data,prefs.benefits);
-  const benefitPanel = host.querySelector('.benefit');
-  const solarHost = document.createElement('div');
-  host.querySelector('.offer-benefits').append(solarHost);
+  const region = host.querySelector('.offer-benefits');
+  const feeHost = region.querySelector('[data-fee-box]'), solarHost = region.querySelector('[data-solar-box]');
+  const benefits = mountBenefits(feeHost,data,prefs.benefits);
   const solar = mountSolarBenefits(solarHost,data,prefs.solar);
+  const feeTab = region.querySelector('[data-benefit-tab="fee"]'), solarTab = region.querySelector('[data-benefit-tab="solar"]');
+  let active = prefs.benefitTab === 'solar' ? 'solar' : 'fee';
   function applyBenefitsScope() {
-    benefitPanel.hidden = !Boolean(choices.compensator) && !groups.some(row => row.kind === 'compensator' && !row.products.length);
-    solarHost.hidden = !choices.inverter && !choices.storage;
-    host.querySelector('[data-benefits]').disabled = solarHost.hidden && benefitPanel.hidden;
+    feeTab.hidden = !choices.compensator;
+    solarTab.hidden = !choices.inverter && !choices.storage;
+    solarTab.textContent = choices.inverter && choices.storage ? 'Falownik i magazyn' : choices.inverter ? 'Falownik' : 'Magazyn';
+    if (feeTab.hidden) active='solar';
+    if (solarTab.hidden) active='fee';
+    feeHost.hidden = active !== 'fee' || feeTab.hidden;
+    solarHost.hidden = active !== 'solar' || solarTab.hidden;
+    feeTab.setAttribute('aria-pressed',String(!feeHost.hidden)); solarTab.setAttribute('aria-pressed',String(!solarHost.hidden));
+    const empty = feeTab.hidden && solarTab.hidden;
+    if (empty) region.hidden = true;
+    host.querySelector('[data-benefits]').disabled = empty;
+    if (!region.hidden && !empty) (active === 'fee' ? benefits : solar).open();
   }
+  for (const tab of [feeTab,solarTab]) tab.onclick = () => {active=tab.dataset.benefitTab;applyBenefitsScope();};
   host.addEventListener('change',applyBenefitsScope,{signal:handlers.signal}); applyBenefitsScope();
-  host.querySelector('[data-benefits]').onclick=()=>{if(!benefitPanel.hidden)benefits.open(); else if(!solarHost.hidden)solar.open(); host.querySelector('.offer-benefits').scrollIntoView({block:'start'});};
+  host.querySelector('[data-benefits]').onclick=()=>{region.hidden=false;applyBenefitsScope();region.scrollIntoView({block:'start'});};
   host.querySelector('[data-edit]').onclick=handlers.edit;
   host.querySelector('[data-details]').onclick=handlers.details;
   host.querySelector('[data-help]').onclick=handlers.help;
-  return {snapshot:()=>({choices:{...choices},benefits:benefits.prefs(),solar:solar.prefs()}), destroy:()=>benefits.destroy()};
+  return {snapshot:()=>({choices:{...choices},benefits:benefits.prefs(),solar:solar.prefs(),benefitTab:active}), destroy:()=>benefits.destroy()};
 }

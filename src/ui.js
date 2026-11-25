@@ -96,6 +96,7 @@ function showInitialOffer() {
   earlyView = renderInitialOffer(host,state.catalog,data,earlyPrefs,{
     signal:earlySession.signal, edit:() => showStep(1), details:() => showStep(2),
     help:() => continueStart(data,true),
+    addKind:kind => continueStart({...data,kinds:[...data.kinds,kind]}),
   });
   host.querySelector('h2').focus({preventScroll:true});
   window.scrollTo(0,0);

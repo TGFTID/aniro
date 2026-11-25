@@ -119,6 +119,7 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
   }
 
   function getProposedKinds(data) {
+    if ([data.billTotal, data.reactiveFee].some(raw => Number.isFinite(readNumber(raw)))) return devices.map(device => device.kind)
     return fields.filter(field => field.kind && readNumber(data[field.key], field.positive) > 0).map(field => field.kind)
   }
 
@@ -177,7 +178,6 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
     if (!validateBeforeContinuing()) return
     const data = snapshot()
     if (!data.kinds.length) data.kinds = getProposedKinds(data)
-    if (!data.kinds.length && data.billTotal !== '') data.kinds = devices.map(device => device.kind)
     if (!data.kinds.length) {
       feedback.textContent = 'Zaznacz urządzenie albo wybierz pomoc z pomiarem energii biernej.'
       feedback.hidden = false
@@ -189,7 +189,8 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
 
   query('#quick-start-invoice').addEventListener('click', () => {
     if (!validateBeforeContinuing()) return
-    cards.find(card => card.value === 'compensator').checked = true
+    const automatic = !cards.some(card => card.checked)
+    for (const card of cards) if (automatic || card.value === 'compensator') card.checked = true
     changed()
     onInvoice(snapshot())
   })
