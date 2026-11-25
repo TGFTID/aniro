@@ -16,7 +16,7 @@ Sesja działa w przeglądarce. Dokumenty prywatne pozostają poza repozytorium i
 
 ## Faktura i powrót do sprawy
 
-Na pierwszym ekranie wybierz „Mam na fakturze opłatę za energię bierną”. Obie kwoty można wpisać albo ustawić suwakiem. Jeśli brakuje pomiaru, przycisk „Nie wiem” przygotuje tekst do skopiowania. „Zapisz i wyjdź” zachowuje pytanie i wpisane odpowiedzi. Po powrocie otwórz zapisaną sprawę na stronie startowej w tej samej przeglądarce pod tym samym adresem.
+Na pierwszym ekranie zaznacz dowolną kombinację kart falownika, magazynu i kompensatora lub wybierz „Mam na fakturze opłatę za energię bierną”. Możesz wpisać lub ustawić suwakiem całą kwotę faktury, opłatę za energię bierną, szukaną moc falownika i pojemność magazynu. Nieznane wartości pozostaw puste. Obecny falownik i jego model podaje się osobno. Sprawę możesz zapisać już po pierwszym wpisie. Ankieta wykorzystuje zapisane odpowiedzi, a przy wstępnych wartościach technicznych prosi o ich źródło. Jeśli brakuje pomiaru, przycisk „Nie wiem” przygotuje tekst do skopiowania. „Zapisz i wyjdź” zachowuje pytanie i wpisane odpowiedzi. Po powrocie otwórz zapisaną sprawę na stronie startowej w tej samej przeglądarce pod tym samym adresem.
 
 Po wprowadzeniu pomiarów ze źródłami wybierz urządzenia, ilości i warunki. Dokument po zatwierdzeniu można wydrukować lub zapisać do PDF. Kwoty faktury i obecność falowników opisują obiekt. Moc i ceny urządzeń wynikają z osobnych danych. „Pobierz dane robocze” zapisuje dodatkową kopię JSON do odczytu.
 
@@ -25,3 +25,5 @@ Projekt przygotowano do serwowania plików statycznych pod docelowym adresem www
 ## Powtórzenie odbioru
 
 Przy działającym serwerze uruchom `python scripts/acceptance.py` w środowisku z Playwright dla Pythona, Chromium i PyMuPDF. Skrypt sprawdza SHA z interfejsu, przechodzi formularze na danych syntetycznych, pobiera szkic, otwiera źródło PDF i weryfikuje wydruk oferty. Wyniki i zrzuty zapisuje w `output/acceptance/`. Tryb `--preview` służy do sprawdzania lokalnych zmian przed commitem.
+
+Stan przekazania i wskazówki dla kolejnej sesji są w [docs/STATE.md](docs/STATE.md).

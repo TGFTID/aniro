@@ -28,6 +28,37 @@ MEASUREMENT_SOURCE = "Protokół syntetyczny do odbioru"
 VIEWPORTS = {"desktop": (1440, 900), "mobile": (390, 844)}
 COMPENSATION_MODEL = "ASVG 15 CABINET"
 PAIR_MODELS = ("SUNWODA OASIS 60KWH", "SINEXCEL ISUNA 20000T")
+QUICK_FIELDS = ("billTotal", "reactiveFee", "acPowerKw", "capacityKwh")
+SCENARIO_KINDS = {
+    "compensation": ("compensator",),
+    "storage": ("storage",),
+    "inverter": ("inverter",),
+    "storage-inverter": ("storage", "inverter"),
+    "compensation-inverter": ("compensator", "inverter"),
+    "compensation-storage": ("compensator", "storage"),
+    "combined": ("compensator", "storage", "inverter"),
+}
+# Sprawa zapisana przez interfejs buildu 48f92155215bad75a09a44dc2553c9b8badde17e.
+LEGACY_CASE = {
+    "version": 1,
+    "id": "c15a5832-3d39-42f3-9b67-8e7bccb8a7a9",
+    "scenario": "compensation",
+    "inputs": {"reactivePowerKvar": {"value": "15", "source": "Pomiar testowy 2026-11-20"}},
+    "progress": {
+        "position": "reactiveDirection",
+        "invoice": {"reactiveFee": "267", "billTotal": "1234", "period": "listopad 2026"},
+        "siteInverters": "no",
+        "missingQuestion": None,
+    },
+    "step": 2,
+    "updated": "2026-11-25T17:37:36.833Z",
+    "catalogDate": "2026-11-17",
+    "lines": [],
+    "option": None,
+    "terms": {key: "" for key in (
+        "vatRate", "discountRate", "labour", "transport", "extrasCurrency", "priceBasis", "commercialSource", "scope",
+    )},
+}
 
 
 def check_width(page, stage):
@@ -36,10 +67,38 @@ def check_width(page, stage):
     assert max(widths.values()) <= available, (stage, widths, available)
 
 
+def quick_field(page, name):
+    return page.locator(f'#quick-start [name="{name}"]')
+
+
+def quick_kind(page, kind):
+    return page.locator(f'#quick-start [data-kind="{kind}"]')
+
+
+def quick_slider(page, name):
+    return page.locator(f'#quick-start .quick-number:has([name="{name}"]) input[type="range"]')
+
+
+def quick_installed(page, answer):
+    page.locator(f'#quick-start [name="siteInverters"][value="{answer}"]').check()
+
+
+def open_questionnaire(page):
+    page.locator("#quick-start-next").click()
+    expect(page.locator("#step-2")).to_be_visible()
+
+
+def expect_question(page, key):
+    expect(page.locator(f'#measurements [data-intake-step="{key}"]')).to_be_visible()
+    check_width(page, key)
+
+
 def open_scenario(page, origin, scenario):
     page.goto(origin)
-    page.locator(f'[data-scenario="{scenario}"]').click()
-    expect(page.locator("#step-2")).to_be_visible()
+    for kind in SCENARIO_KINDS[scenario]:
+        quick_kind(page, kind).check()
+    quick_installed(page, "no")
+    open_questionnaire(page)
     check_width(page, scenario)
 
 
@@ -164,18 +223,76 @@ def export_incomplete_draft(page):
     assert draft["scenario"] == "compensation" and not draft["installationApproval"]
 
 
+def check_empty_start(page, screen):
+    expect(page.locator("#quick-start-title")).to_have_text("Co chcesz dobrać?")
+    expect(page.locator("#quick-start input[type=range]")).to_have_count(4)
+    expect(page.locator("#quick-start input[data-kind]")).to_have_count(3)
+    expect(page.locator("#quick-start input[data-kind]:checked")).to_have_count(0)
+    expect(page.locator('#quick-start [name="siteInverters"]:checked')).to_have_count(0)
+    expect(quick_field(page, "inverterModel")).to_be_hidden()
+    expect(page.locator("[data-save-case]")).to_be_hidden()
+    assert page.locator("#quick-start img").evaluate_all(
+        "images => images.length === 3 && images.every(image => image.complete && image.naturalWidth > 0)"
+    ), "Brak fotografii na kartach urządzeń"
+    capture(page, screen, "start", "#step-1")
+    expect(page.locator("#quick-start-next")).to_be_in_viewport(ratio=1)
+    for key in QUICK_FIELDS:
+        field = quick_field(page, key)
+        slider = quick_slider(page, key)
+        expect(field).to_be_visible()
+        expect(field).to_have_value("")
+        expect(slider).to_be_visible()
+        expect(slider).to_have_attribute("aria-valuetext", "Brak wartości")
+        slider.press("ArrowRight")
+        expect(field).to_have_value(re.compile(r"0[.,]0[12]"))
+        expect(slider).to_have_attribute("aria-valuetext", re.compile(r"^0[.,]0[12] (zł|kW|kWh)$"))
+        field.fill("123,45")
+        expect(slider).to_have_value("123.45")
+        field.fill("")
+        expect(slider).to_have_attribute("aria-valuetext", "Brak wartości")
+    for key in ("billTotal", "reactiveFee"):
+        field = quick_field(page, key)
+        slider = quick_slider(page, key)
+        field.fill("0")
+        expect(slider).to_have_value("0")
+        expect(slider).to_have_attribute("aria-valuetext", "0 zł")
+        field.fill("")
+        expect(slider).to_have_value("0")
+        expect(slider).to_have_attribute("aria-valuetext", "Brak wartości")
+    for key in ("acPowerKw", "capacityKwh"):
+        field = quick_field(page, key)
+        field.fill("0")
+        page.locator("#quick-start-next").click()
+        expect(field).to_have_attribute("aria-invalid", "true")
+        expect(field).to_be_focused()
+        expect(page.locator("#step-2")).to_be_hidden()
+        field.fill("")
+    page.locator("#quick-start-next").click()
+    expect(page.locator("#quick-start-feedback")).to_be_visible()
+    expect(page.locator("#step-2")).to_be_hidden()
+    page.locator("#quick-start-unknown").click()
+    expect(page.locator("#step-2")).to_be_visible()
+    message = page.locator("#intake-message")
+    expect(message).to_be_visible()
+    assert "moc kompensacji" in message.input_value().lower()
+    expect(page.locator('[data-step="3"]')).to_be_disabled()
+    check_width(page, "pomoc przy pustym starcie")
+
+
+def start_invoice(page, origin, screen=None):
+    page.goto(origin)
+    quick_field(page, "reactiveFee").fill("250")
+    quick_field(page, "billTotal").fill("1200")
+    quick_installed(page, "no")
+    if screen:
+        capture(page, screen, "invoice", "#quick-start")
+    page.locator("#quick-start-invoice").click()
+    expect(page.locator("#step-2")).to_be_visible()
+    expect_question(page, "reactivePowerKvar")
+
+
 def open_help_and_resume(context, page, origin, new_page, screen):
-    open_scenario(page, origin, "compensation")
-    sliders = page.locator("#measurements [data-amount-slider]")
-    expect(sliders).to_have_count(2)
-    fee = page.locator('#measurements [name="reactiveFee"]')
-    fee_slider = page.locator('[data-amount-slider="reactiveFee"]')
-    expect(fee).to_have_value("")
-    fee_slider.press("ArrowRight")
-    expect(fee).to_have_value("0.01")
-    fee.fill("250")
-    expect(fee_slider).to_have_value("250")
-    capture(page, screen, "invoice", "#measurements")
+    start_invoice(page, origin, screen)
     page.locator("#measurements").get_by_role("button", name="Nie wiem", exact=True).click()
     help_message = page.locator("#intake-message")
     expect(help_message).to_be_visible()
@@ -193,24 +310,21 @@ def open_help_and_resume(context, page, origin, new_page, screen):
     export_incomplete_draft(page)
 
     page.get_by_role("button", name="Zapisz i wyjdź", exact=True).click()
-    expect(page.locator("[data-resume-case]")).to_be_visible()
+    expect(page.locator("#saved-cases [data-resume-case]")).to_be_visible()
     page.close()
     reopened = new_page(context)
     reopened.goto(origin)
-    reopened.locator("[data-resume-case]").click()
+    reopened.locator("#saved-cases [data-resume-case]").click()
     expect(reopened.locator("#intake-message")).to_have_value(message)
     reopened.get_by_role("button", name="Wróć do pytania", exact=True).click()
-    expect(reopened.locator('#measurements [name="reactiveFee"]')).to_have_value("250")
+    expect_question(reopened, "reactivePowerKvar")
+    reopened.locator('[data-step="1"]').click()
+    expect(quick_field(reopened, "reactiveFee")).to_have_value("250")
+    expect(quick_field(reopened, "billTotal")).to_have_value("1200")
+    expect(quick_kind(reopened, "compensator")).to_be_checked()
+    open_questionnaire(reopened)
+    expect_question(reopened, "reactivePowerKvar")
     return reopened
-
-
-def complete_invoice(page):
-    enter_field(page, "reactiveFee", "250")
-    enter_field(page, "billTotal", "1200")
-    enter_field(page, "billPeriod", "listopad 2026")
-    next_question(page)
-    enter_field(page, "siteInverters", "no")
-    next_question(page)
 
 
 def capture(page, screen, stage, target, align=False):
@@ -245,7 +359,6 @@ def check_accessories_and_catalog(page):
 
 
 def check_compensation(page, screen):
-    complete_invoice(page)
     first = page.locator('#measurements [name="reactivePowerKvar"]')
     expect(first).to_have_value("")
     capture(page, screen, "form", "#measurements")
@@ -265,7 +378,9 @@ def check_compensation(page, screen):
     expect(quote.locator(".totals")).to_have_count(2)
     expect(quote).to_contain_text("2026-11-17")
     capture(page, screen, "preview", "#quote", align=screen == "mobile")
-    pages = verify_printed_offer(page, f"{screen}-compensation", (COMPENSATION_MODEL,), ("4483,35", "369,00"))
+    context_terms = ("Dane z faktury i instalacji", "Opłata za energię bierną", "Cała faktura",
+                     "Falowniki na obiekcie", "250 zł", "1200 zł")
+    pages = verify_printed_offer(page, f"{screen}-compensation", (COMPENSATION_MODEL, *context_terms), ("4483,35", "369,00"))
 
     page.locator('#terms-form [name="transport"]').fill("120")
     expect(quote).to_be_hidden()
@@ -290,21 +405,176 @@ def check_unknown_breaks_selection(page):
 
 
 def check_unsaved_answer_survives_resume(page, origin):
-    open_scenario(page, origin, "compensation")
-    page.locator('[name="reactiveFee"]').fill("267")
-    page.locator("[data-save-case]").click()
-    expect(page.locator("#save-status")).to_contain_text("Sprawa zapisana")
+    page.goto(origin)
+    quick_kind(page, "compensator").check()
+    quick_field(page, "reactiveFee").fill("267")
+    saved = save_new_case(page)
+    expect(saved).to_contain_text("Kompensacja mocy biernej")
     page.locator("#new-case").click()
-    saved = page.locator("[data-resume-case]").first
-    expect(saved).to_contain_text("Mam na fakturze opłatę za energię bierną")
-    page.locator('[data-scenario="storage"]').click()
+    expect(page.locator("#step-1")).to_be_visible()
+    expect(quick_field(page, "reactiveFee")).to_have_value("")
+    expect(quick_kind(page, "compensator")).not_to_be_checked()
+    quick_kind(page, "storage").check()
+    open_questionnaire(page)
+    expect_question(page, "capacityKwh")
     page.locator('#measurements [name="capacityKwh"]').fill("733")
     page.locator('#measurements [data-intake-action="back"]').click()
     saved.click()
-    expect(page.locator('#measurements [name="reactiveFee"]')).to_have_value("267")
-    page.locator('[data-step="1"]').click()
-    page.locator('[data-scenario="storage"]').click()
+    expect(page.locator("#step-1")).to_be_visible()
+    expect(quick_field(page, "reactiveFee")).to_have_value("267")
+    expect(quick_kind(page, "compensator")).to_be_checked()
+    expect(page.locator("#saved-cases")).to_contain_text("Sprawy w tej karcie")
+    page.locator("#saved-cases [data-resume-case]").filter(has_text="Magazyn energii").click()
+    expect(quick_field(page, "capacityKwh")).to_have_value("733")
+    open_questionnaire(page)
+    expect_question(page, "capacityKwh")
     expect(page.locator('#measurements [name="capacityKwh"]')).to_have_value("733")
+
+
+def save_new_case(page):
+    rows = page.locator("#saved-cases [data-resume-case]")
+    ids = "buttons => buttons.map(button => button.dataset.resumeCase)"
+    before = set(rows.evaluate_all(ids))
+    page.locator("[data-save-case]").click()
+    expect(page.locator("#save-status")).to_contain_text("Sprawa zapisana")
+    added = set(rows.evaluate_all(ids)) - before
+    assert len(added) == 1, added
+    return page.locator(f'#saved-cases [data-resume-case="{added.pop()}"]')
+
+
+def save_partial_start(page, origin, key, value):
+    page.goto(origin)
+    quick_field(page, key).fill(value)
+    saved = save_new_case(page)
+    page.reload()
+    saved.click()
+    expect(page.locator("#step-1")).to_be_visible()
+    expect(page.locator("#quick-start input[data-kind]:checked")).to_have_count(0)
+    for field in QUICK_FIELDS:
+        expect(quick_field(page, field)).to_have_value(value if field == key else "")
+
+
+def confirm_quick_source(page, key, value):
+    expect_question(page, key)
+    expect(page.locator("#intake-heading")).to_contain_text("Skąd pochodzi")
+    field = page.locator(f'#measurements [name="{key}"]')
+    source = page.locator(f'#measurements [name="{key}-source"]')
+    expect(field).to_have_value(value)
+    expect(source).to_have_value("")
+    submit = page.locator('#measurements button[type="submit"]')
+    submit.click()
+    expect(page.locator("#intake-error")).to_contain_text("Podaj źródło")
+    expect(source).to_be_focused()
+    expect(page.locator('[data-step="3"]')).to_be_disabled()
+    source.fill(MEASUREMENT_SOURCE)
+    submit.click()
+
+
+def check_only_power(page, origin):
+    save_partial_start(page, origin, "acPowerKw", "20")
+    expect(page.locator(".quick-suggestion")).to_contain_text("falownik")
+    open_questionnaire(page)
+    expect_question(page, "acPowerKw")
+    page.locator('#measurements [data-intake-action="unknown"]').click()
+    message = page.locator("#intake-message").input_value()
+    assert "20 kW" in message and "źródł" in message.lower(), message
+    assert "magazyn" not in message.lower() and "kompensacj" not in message.lower(), message
+    page.locator('#measurements [data-intake-action="return"]').click()
+    confirm_quick_source(page, "acPowerKw", "20")
+    expect_question(page, "inverterVoltageV")
+    enter_measurements(page, {"inverterVoltageV": "400", "inverterUse": "hybrid"})
+    expect(page.locator("#groups > section > h3")).to_have_text(["Falowniki"])
+    page.locator('[data-step="1"]').click()
+    quick_field(page, "billTotal").fill("1200")
+    open_questionnaire(page)
+    expect(page.locator("#intake-heading")).to_have_text("Możesz porównać urządzenia")
+    page.get_by_role("button", name="Porównaj urządzenia", exact=True).click()
+    expect(page.locator("#groups > section > h3")).to_have_text(["Falowniki"])
+
+    page.locator('[data-step="1"]').click()
+    quick_field(page, "acPowerKw").fill("21")
+    open_questionnaire(page)
+    confirm_quick_source(page, "acPowerKw", "21")
+    expect(page.locator("#step-3")).to_be_visible()
+
+
+def check_only_amounts(page, origin):
+    save_partial_start(page, origin, "reactiveFee", "250")
+    expect(page.locator(".quick-suggestion")).to_contain_text("kompensator")
+    open_questionnaire(page)
+    expect_question(page, "inverters")
+    enter_field(page, "siteInverters", "no")
+    next_question(page)
+    expect_question(page, "reactivePowerKvar")
+    expect(page.locator('#measurements [name="reactivePowerKvar"]')).to_have_value("")
+    expect(page.locator('[data-step="3"]')).to_be_disabled()
+    enter_measurements(page, COMPENSATION)
+    expect(page.locator("#groups > section > h3")).to_have_text(["Kompensatory"])
+
+    save_partial_start(page, origin, "billTotal", "1200")
+    expect(page.locator(".quick-suggestion")).to_be_hidden()
+    page.locator("#quick-start-next").click()
+    expect(page.locator("#quick-start-feedback")).to_be_visible()
+    expect(page.locator("#step-2")).to_be_hidden()
+    expect(quick_field(page, "billTotal")).to_have_value("1200")
+
+
+def check_existing_inverter(page, origin):
+    model = "SINEXCEL ISUNA 20000T"
+    page.goto(origin)
+    quick_field(page, "capacityKwh").fill("60")
+    quick_field(page, "acPowerKw").fill("20")
+    expect(page.locator(".quick-suggestion")).to_contain_text("falownik")
+    expect(page.locator(".quick-suggestion")).to_contain_text("magazyn")
+    quick_kind(page, "storage").check()
+    expect(page.locator(".quick-suggestion")).to_be_hidden()
+    quick_installed(page, "yes")
+    quick_field(page, "inverterModel").fill(model)
+    open_questionnaire(page)
+    expect(page.locator("#measurements")).to_contain_text(model)
+    expect(page.locator("#measurements")).to_contain_text("BMS")
+    expect(page.locator('#measurements [name="inverterModel"]')).to_have_count(0)
+    confirm_quick_source(page, "capacityKwh", "60")
+    expect_question(page, "capacityBasis")
+    enter_measurements(page, {"capacityBasis": "nominal", "storagePowerKw": "10"})
+    expect(page.locator("#groups > section > h3")).to_have_text(["Magazyny energii"])
+
+
+def check_group_scope(page, origin):
+    for scenario, fields, headings in (
+        ("compensation-inverter", {**COMPENSATION, "acPowerKw": "20", "inverterVoltageV": "400", "inverterUse": "hybrid"},
+         ["Kompensatory", "Falowniki"]),
+        ("compensation-storage", {**COMPENSATION, "capacityKwh": "60", "capacityBasis": "nominal", "storagePowerKw": "10"},
+         ["Kompensatory", "Magazyny energii"]),
+    ):
+        open_scenario(page, origin, scenario)
+        enter_measurements(page, fields)
+        expect(page.locator("#groups > section > h3")).to_have_text(headings)
+
+
+def check_legacy_case(page, origin):
+    page.goto(origin)
+    page.evaluate("""row => localStorage.setItem('aniro.cases.v1.' + row.id, JSON.stringify(row))""", LEGACY_CASE)
+    page.reload()
+    page.locator(f'#saved-cases [data-resume-case="{LEGACY_CASE["id"]}"]').click()
+    expect_question(page, "reactiveDirection")
+    back = page.locator('#measurements [data-intake-action="back"]')
+    back.click()
+    expect(page.locator('#measurements [name="reactivePowerKvar"]')).to_have_value("15")
+    expect(page.locator('#measurements [name="reactivePowerKvar-source"]')).to_have_value("Pomiar testowy 2026-11-20")
+    back.click()
+    expect(page.locator('#measurements [name="siteInverters"]')).to_have_value("no")
+    back.click()
+    expect_question(page, "invoice")
+    expect(page.locator('#measurements [name="reactiveFee"]')).to_have_value("267")
+    expect(page.locator('#measurements [name="billTotal"]')).to_have_value("1234")
+    expect(page.locator('#measurements [name="billPeriod"]')).to_have_value("listopad 2026")
+    next_question(page)
+    next_question(page)
+    next_question(page)
+    expect_question(page, "reactiveDirection")
+    enter_measurements(page, {key: value for key, value in COMPENSATION.items() if key != "reactivePowerKvar"})
+    expect(page.locator("#groups > section > h3")).to_have_text(["Kompensatory"])
 
 
 def check_pair(page, origin, screen, partial=False):
@@ -347,7 +617,6 @@ def check_pair(page, origin, screen, partial=False):
 
 def check_catalog_conflict(page, origin):
     open_scenario(page, origin, "compensation")
-    complete_invoice(page)
     enter_measurements(page, {**COMPENSATION, "reactivePowerKvar": "100", "harmonicsRequired": "yes", "harmonics": "13"})
     card = find_product(page, CONFLICT)
     open_card_details(card)
@@ -358,7 +627,6 @@ def check_catalog_conflict(page, origin):
 
 def check_unconfirmed_pair(page, origin):
     open_scenario(page, origin, "combined")
-    complete_invoice(page)
     enter_measurements(page, {**COMPENSATION, **PAIR})
     choose_product(page, CABINET, "compensator")
     choose_product(page, A200, "storage")
@@ -383,7 +651,7 @@ def audit(origin, preview, expected_sha, channel):
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     expected = expected_sha or head
-    errors, outside, screens = [], [], {}
+    errors, failed, outside, screens = [], [], [], {}
     origin_server = urlparse(origin).netloc
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel=channel)
@@ -394,6 +662,7 @@ def audit(origin, preview, expected_sha, channel):
             page.set_default_timeout(7000)
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+            page.on("requestfailed", lambda request: failed.append((request.url, request.failure)))
             page.on("request", lambda request: outside.append(request.url)
                     if urlparse(request.url).scheme in ("http", "https")
                     and urlparse(request.url).netloc != origin_server else None)
@@ -405,8 +674,6 @@ def audit(origin, preview, expected_sha, channel):
                 context.grant_permissions(["clipboard-read", "clipboard-write"], origin=origin)
                 page = new_page(context)
                 page.goto(origin)
-                expect(page.locator('[data-scenario="compensation"]')).to_be_visible()
-                capture(page, screen, "start", "#step-1")
                 build = page.request.get(origin + "/version.json").json()["commit"]
                 if version is None:
                     version = build
@@ -414,10 +681,23 @@ def audit(origin, preview, expected_sha, channel):
                 if not preview:
                     assert build == expected, (build, expected)
                     expect(page.locator("#version")).to_have_attribute("title", expected)
+                try:
+                    check_empty_start(page, screen)
+                except AssertionError as error:
+                    raise AssertionError(f"Start {screen}: błędy konsoli {errors}, nieudane żądania {failed}") from error
+                check_only_power(page, origin)
+                check_only_amounts(page, origin)
+                check_existing_inverter(page, origin)
+
+                # Start the help case without earlier persistent synthetic drafts.
+                page.evaluate("localStorage.clear()")
 
                 page = open_help_and_resume(context, page, origin, new_page, screen)
                 pdfs = {"compensation": check_compensation(page, screen), "pair": check_pair(page, origin, screen)}
-                scenarios = ["invoice-amount-slider", "invoice-copy-save-resume", "back-keeps-data",
+                scenarios = ["four-empty-slider-fields", "explicit-zero-versus-empty", "help-from-empty-start",
+                             "only-power-resume-confirm-source", "known-source-kept-until-power-changes", "only-reactive-fee-resume",
+                             "only-total-asks-for-scope", "known-inverter-and-capacity", "manual-scope-over-suggestions",
+                             "invoice-copy-save-resume", "back-keeps-data",
                              "compensation-offer-print",
                              "incompatible-inverter-blocked", "documented-pair-offer-print",
                              "missing-accessory-data", "edit-invalidates-offer", "unknown-clears-selection"]
@@ -425,7 +705,10 @@ def audit(origin, preview, expected_sha, channel):
                     check_catalog_conflict(page, origin)
                     pdfs["partialPair"] = check_pair(page, origin, screen, partial=True)
                     check_unsaved_answer_survives_resume(page, origin)
-                    scenarios += ["harmonics-conflict", "partial-pair-offer-print", "resume-keeps-other-answer"]
+                    check_group_scope(page, origin)
+                    check_legacy_case(page, origin)
+                    scenarios += ["harmonics-conflict", "partial-pair-offer-print", "resume-keeps-other-answer",
+                                  "compensator-inverter-and-compensator-storage-scope", "resume-v1-from-48f9215"]
                 else:
                     check_unconfirmed_pair(page, origin)
                     scenarios.append("unconfirmed-pair-single-option")
@@ -434,10 +717,11 @@ def audit(origin, preview, expected_sha, channel):
         browser.close()
 
     assert not errors, errors
+    assert not failed, failed
     assert not outside, outside
     report = {"commit": version, "mode": "preview" if preview else "exact-sha", "gitHead": head,
               "browser": f"{channel or 'Chromium'} {browser_version}", "screens": screens,
-              "consoleErrors": errors, "externalRequests": outside}
+              "consoleErrors": errors, "failedRequests": failed, "externalRequests": outside}
     encoded = json.dumps(report, ensure_ascii=False, separators=(",", ":"))
     (ARTIFACTS / "report.json").write_text(encoded + "\n", encoding="utf-8")
     print(encoded)

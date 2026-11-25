@@ -7,6 +7,8 @@ export const SCENARIOS = [
   { id: "storage", label: "Magazyn energii", description: "Porównaj pojemność i znamionową moc baterii." },
   { id: "inverter", label: "Falownik", description: "Porównaj znamionową moc AC i napięcie znamionowe w trybie sieciowym." },
   { id: "storage-inverter", label: "Magazyn i falownik", description: "Porównaj urządzenia oraz udokumentowany zakres współpracy." },
+  { id: "compensation-inverter", label: "Kompensacja i falownik", description: "Porównaj kompensatory i falowniki dla tego samego obiektu." },
+  { id: "compensation-storage", label: "Kompensacja i magazyn", description: "Porównaj kompensatory i magazyny energii dla tego samego obiektu." },
   { id: "combined", label: "Rozwiązanie łączone", description: "Sprawdź wymagania dla kompensatora, magazynu i falownika." },
 ];
 
@@ -15,6 +17,8 @@ const groupsByScenario = {
   storage: ["storage"],
   inverter: ["inverter"],
   "storage-inverter": ["storage", "inverter"],
+  "compensation-inverter": ["compensator", "inverter"],
+  "compensation-storage": ["compensator", "storage"],
   combined: ["compensator", "storage", "inverter"],
 };
 
@@ -271,6 +275,8 @@ export function selectProducts(scenario, inputs, catalog) {
   const hasPair = kinds.includes("storage") && kinds.includes("inverter");
   if (hasPair) checklist.push("Potwierdź zgodność dokładnych modeli, oprogramowania, BMS, napięć i komunikacji. Ustal ilości i wyposażenie na podstawie projektu.");
   if (scenario === "combined") checklist.push("Zweryfikuj współpracę kompensatora z układem magazyn–falownik w projekcie instalacji.");
+  if (scenario === "compensation-inverter") checklist.push("Zweryfikuj wpływ pracy falownika na zapotrzebowanie na kompensację w projekcie instalacji.");
+  if (scenario === "compensation-storage") checklist.push("Zweryfikuj działanie kompensacji podczas ładowania i rozładowywania magazynu w projekcie instalacji.");
   if (missingInputs.length) {
     return { status: "missing-input", selectionRulesVersion: SELECTION_RULES_VERSION, missingInputs,
       inputs: values, groups: [], compatibility: [], checklist };

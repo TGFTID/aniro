@@ -1,5 +1,13 @@
 # Aniro · plan i kryteria odbioru
 
+## Wariant 2 w aplikacji · 25.11.2026
+
+Baza 48f9215 na main. Zaakceptowany wzór to widok Karty z lokalnego porównania. Pierwszy ekran gromadzi wybór dowolnego podzbioru trzech klas urządzeń, cztery opcjonalne wartości i dane istniejącego falownika. Wcześniejsza wersja zbierała kwoty dopiero podczas ankiety i obsługiwała pięć zestawów klas.
+
+- Rozłączne moduły w posiadanym limicie Codex, GPT-6.2 Sol: szybki formularz (JS/CSS), pytania i scenariusze (JS/testy), odbiór Playwright (Python). Integrator odpowiada za zapis, wznowienie starszych spraw, wydruk i dokładny SHA. Brak zewnętrznego API w przepływie.
+- Kwoty pozostają opisem faktury. Podane kW i kWh to wymagania dla szukanego urządzenia. Ankieta zbiera ich pochodzenie, bez ponownego przepisywania. Zmiana wartości usuwa wcześniejsze potwierdzenie. Dla niepotwierdzonego zestawu wycenia się osobne warianty.
+- DONE: nowy start przy 390×844 i na komputerze, częściowe dane, zapis po edycji startu, stary format sprawy, dobór do wydruku i kontrola niezależna. Handoff w docs/STATE.md. Powrót do wcześniejszej wersji aplikacji przez osobny checkout 48f9215.
+
 ## Przebudowa ścieżki klienta · 25.11.2026
 
 Punkt wyjścia to czysty `main` w TGFTID/aniro, d433367. Poprzedni formularz wymagał kompletu danych od razu, a pobranego szkicu nie można było wznowić w interfejsie. Rejestr z 09.11 poprzedza powstanie tej aplikacji. Własność i lokalizację potwierdzają przekazanie i sekcja 3 nadrzędnego STAN.md.

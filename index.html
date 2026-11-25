@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./src/tokens.css">
   <link rel="stylesheet" href="./src/styles.css">
   <link rel="stylesheet" href="./src/workspace.css">
+  <link rel="stylesheet" href="./src/quick-start.css">
   <script type="module" src="./src/ui.js"></script>
 </head>
 <body>
@@ -27,7 +28,7 @@
 
   <main id="main" class="shell">
     <div class="workspace-bar"><span id="stage-label">Nowa sprawa</span><span id="save-status" role="status"></span></div>
-    <div class="workspace">
+    <div class="workspace" data-step-active="1">
       <div class="editor">
       <nav aria-label="Etapy doboru" class="workflow">
         <ol>
@@ -41,14 +42,9 @@
       <div class="stage">
         <p id="catalog-status" class="notice" role="status">Ładowanie katalogu Aniro…</p>
         <noscript><p class="notice alert">Włącz JavaScript, aby wczytać katalog i przejść przez dobór.</p></noscript>
-        <section id="step-1" class="step" aria-labelledby="title-1">
+        <section id="step-1" class="step" aria-labelledby="quick-start-title">
+          <div id="quick-start" inert></div>
           <div id="saved-cases" hidden></div>
-          <h2 id="title-1" tabindex="-1">Od czego chcesz zacząć?</h2>
-          <div id="scenarios" class="choices"></div>
-          <details class="start-help"><summary>Nie wiem, od czego zacząć</summary>
-            <p>Jeśli na rozliczeniu dystrybucji widzisz opłatę za energię bierną, zacznij od faktury. Przy panelach i nadwyżkach energii wybierz magazyn. Jeśli instalator wskazał urządzenia, możesz samodzielnie wybrać zakres z listy powyżej.</p>
-            <button type="button" id="start-invoice">Zacznij od faktury</button>
-          </details>
         </section>
 
         <section id="step-2" class="step" aria-labelledby="title-2" hidden>

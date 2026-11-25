@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const output = resolve(root, 'dist')
 const temporary = await mkdtemp(join(root, '.build-'))
-const assets = ['index.html', 'src/aniro-logo.png', 'data/catalog.json', 'docs/ANIRO-DATA-SOURCES.md', 'docs/ANIRO-SELECTION-RULES.md']
+const assets = ['index.html', 'src/aniro-logo.png', 'src/quick-compensator.png', 'src/quick-storage.png', 'src/quick-inverter.png', 'data/catalog.json', 'docs/ANIRO-DATA-SOURCES.md', 'docs/ANIRO-SELECTION-RULES.md']
 for (const [directory, allowed] of [['src', /\.(?:js|css)$/], ['evidence', /\.pdf$/i]]) {
   const entries = await readdir(join(root, directory), {withFileTypes:true})
   assets.push(...entries.filter(entry => entry.isFile() && allowed.test(entry.name)).map(entry => directory + '/' + entry.name))

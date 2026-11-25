@@ -1,6 +1,8 @@
+import { createQuickStart } from './quick-start.js';
+import { scenarioKinds, scenarioFor, hasQuickData, startFromIntake, mergeStartInputs } from './case-start.js';
 import { createIntake } from './intake.js';
 import { loadCatalog } from './catalog.js';
-import { SCENARIOS, getInputFields, selectProducts, getAccessoryOptions } from './selection.js';
+import { getInputFields, selectProducts, getAccessoryOptions } from './selection.js';
 import { quote } from './pricing.js';
 import { pdfFactsById, blockedFieldsById, compatibilityPairs, sourcePdf } from './evidence.js';
 
@@ -26,7 +28,7 @@ const statusLabels = {
   manual: 'Do ręcznej weryfikacji',
   fails: 'Poza wymaganiami',
 };
-const state = { catalog: null, scenario: null, inputs: {}, result: null, selected: new Map(), option: null, caseId: null };
+const state = { catalog: null, scenario: null, inputs: {}, result: null, selected: new Map(), option: null, caseId: null, startEdited: false, measurements: {} };
 
 const el = (id) => document.getElementById(id);
 const text = (value = '') => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -67,7 +69,7 @@ function list(values) {
 
 function updateSteps(current) {
   const actions = document.querySelectorAll('[data-step]');
-  const available = [true, Boolean(state.scenario), Boolean(state.result), Boolean(getReadyOption())];
+  const available = [true, Boolean(state.scenario) && !state.startEdited, Boolean(state.result) && !state.startEdited, Boolean(getReadyOption()) && !state.startEdited];
   for (const [index, action] of actions.entries()) {
     action.disabled = !available[index];
     if (index + 1 === current) action.setAttribute('aria-current', 'step');
@@ -76,15 +78,18 @@ function updateSteps(current) {
 }
 
 function showStep(step) {
+  if (step === 1 && currentStep() !== 1 && state.scenario && !state.startEdited) {
+    quick.open(startFromIntake(state.scenario, intake.snapshot()));
+  }
   if (step !== 4 && !el('quote').hidden) invalidateQuote();
   for (const panel of document.querySelectorAll('.step')) panel.hidden = panel.id !== 'step-' + step;
   updateSteps(step);
   if (step === 4) renderScopeSummary();
   el('input-errors').hidden = true;
-  el('stage-label').textContent = state.scenario ? goals[state.scenario][0] : 'Nowa sprawa';
-  el('case-tools').hidden = !state.scenario;
+  el('stage-label').textContent = state.scenario ? goals[state.scenario] : 'Nowa sprawa';
+  el('case-tools').hidden = !state.caseId && !hasQuickData(quick.snapshot());
   updatePreview();
-  el('title-' + step).focus({preventScroll:true});
+  (step === 1 ? el('quick-start-title') : el('title-' + step))?.focus({preventScroll:true});
   window.scrollTo(0, 0);
 }
 
@@ -106,24 +111,17 @@ function resetResults() {
   state.selected.clear();
   state.option = null;
   invalidateQuote();
-  updateSteps(2);
+  updateSteps(currentStep());
 }
 
 const goals = {
-  compensation: ['Mam na fakturze opłatę za energię bierną', 'Sprawdź pozycję w rozliczeniu dystrybucji.'],
-  storage: ['Chcę magazynować energię z paneli', 'Dobierz magazyn do potrzeb obiektu.'],
-  inverter: ['Szukam falownika', 'Porównaj modele dla swojej instalacji.'],
-  'storage-inverter': ['Chcę magazyn z falownikiem', 'Sprawdź, które urządzenia mogą pracować razem.'],
-  combined: ['Chcę rozpatrzyć wszystkie urządzenia', 'Przygotuj osobne warianty dla kilku potrzeb.'],
+  compensation: 'Kompensacja mocy biernej', storage: 'Magazyn energii', inverter: 'Falownik PV',
+  'storage-inverter': 'Magazyn i falownik', 'compensation-inverter': 'Kompensator i falownik',
+  'compensation-storage': 'Kompensator i magazyn', combined: 'Kompensator, magazyn i falownik',
 };
-function renderScenarios() {
-  el('scenarios').innerHTML = SCENARIOS.map(({ id }) => {
-    const [label, description] = goals[id];
-    return '<button type="button" class="choice" data-scenario="' + id + '" aria-pressed="' + (id === state.scenario) + '">'
-      + '<span><strong>' + label + '</strong><small>' + description + '</small></span><span aria-hidden="true">›</span></button>';
-  }).join('');
+function caseLabel(row) {
+  return goals[scenarioFor(row.start?.kinds)] ?? goals[row.scenario] ?? 'Dane z faktury i instalacji';
 }
-
 const draftsKey = 'aniro.cases.v1';
 const casePrefix = draftsKey + '.';
 const sessionCases = new Map();
@@ -139,19 +137,22 @@ function readCases() {
     const row = JSON.parse(localStorage.getItem(key));
     if (row?.id && key === casePrefix + row.id) byId.set(row.id, row);
   }
-  return [...byId.values()].filter(row => row.version === 1 && Object.hasOwn(goals, row.scenario))
+  return [...byId.values()].filter(row => (row.version === 1 || row.version === 2) && (Object.hasOwn(goals, row.scenario) || row.version === 2 && row.step === 1 && row.start))
     .sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
 }
 
 function showSavedCases() {
   const area = el('saved-cases');
   try {
-    const rows = readCases();
-    area.hidden = !rows.length;
-    area.innerHTML = '<h3>Zapisane sprawy</h3>' + rows.map(row =>
+    const saved = readCases();
+    const ids = new Set(saved.map(row => row.id));
+    const opened = [...sessionCases.values()].filter(row => row.id !== state.caseId && !ids.has(row.id));
+    const group = (title, rows) => rows.length ? '<h3>' + title + '</h3>' + rows.map(row =>
       '<button type="button" class="resume-row" data-resume-case="' + text(row.id) + '"><span><strong>'
-      + text(goals[row.scenario][0]) + '</strong><small>' + text(new Date(row.updated).toLocaleString('pl-PL'))
-      + '</small></span><span>Wznów ›</span></button>').join('');
+      + text(caseLabel(row)) + '</strong><small>' + text(new Date(row.updated).toLocaleString('pl-PL'))
+      + '</small></span><span>Wznów ›</span></button>').join('') : '';
+    area.hidden = !saved.length && !opened.length;
+    area.innerHTML = group('Zapisane sprawy', saved) + group('Sprawy w tej karcie', opened);
   } catch {
     area.hidden = false;
     area.textContent = 'Nie udało się odczytać zapisanych spraw w tej przeglądarce.';
@@ -159,10 +160,13 @@ function showSavedCases() {
 }
 
 function caseData() {
-  const { inputs, progress } = intake.snapshot();
+  const {inputs, progress} = state.scenario ? intake.snapshot() : {inputs:{}, progress:{}};
+  const step = currentStep();
+  const start = step === 1 ? quick.snapshot() : startFromIntake(state.scenario, {inputs,progress});
   return {
-    version: 1, id: state.caseId, scenario: state.scenario, inputs, progress,
-    step: currentStep() === 1 ? (state.result ? 3 : 2) : currentStep(), updated: new Date().toISOString(), catalogDate: state.catalog.snapshotDate,
+    version: 2, id: state.caseId, scenario: state.scenario, inputs, progress, start,
+    measurements: state.measurements, startEdited: state.startEdited, evaluated: Boolean(state.result),
+    step, updated: new Date().toISOString(), catalogDate: state.catalog.snapshotDate,
     lines: [...state.selected.values()].map(({candidate, quantity, quantitySource, technicalSource}) =>
       ({id: candidate.product.id, quantity, quantitySource, technicalSource})),
     option: state.option, terms: readTerms(el('terms-form')),
@@ -170,35 +174,59 @@ function caseData() {
 }
 
 function saveCase() {
-  if (!state.scenario) return false;
+  if (!state.caseId) return false;
   try {
     const row = caseData();
     localStorage.setItem(casePrefix + row.id, JSON.stringify(row));
+    sessionCases.delete(row.id);
     el('save-status').textContent = 'Sprawa zapisana w tej przeglądarce.';
     showSavedCases();
     return true;
   } catch {
-    el('save-status').textContent = 'Zapis w przeglądarce nie powiódł się. Pobierz dane robocze, aby zachować kopię.';
+    el('save-status').textContent = 'Ta przeglądarka nie zapisała sprawy. ';
+    const download = document.createElement('button');
+    download.type = 'button';
+    download.textContent = 'Pobierz kopię danych';
+    download.addEventListener('click', downloadDraft);
+    el('save-status').append(download);
     return false;
+  }
+}
+
+function newId() {
+  return globalThis.crypto?.randomUUID?.() ?? Date.now() + '-' + Math.random().toString(36).slice(2);
+}
+
+function rememberInputs() {
+  if (!state.scenario) return;
+  const inputs = intake.snapshot().inputs;
+  for (const {id} of getInputFields(state.scenario)) {
+    if (Object.hasOwn(inputs,id)) state.measurements[id] = inputs[id];
+    else delete state.measurements[id];
   }
 }
 
 function openCase(scenario, draft) {
   state.scenario = scenario;
-  state.caseId = draft?.id || (globalThis.crypto?.randomUUID?.() ?? Date.now() + '-' + Math.random().toString(36).slice(2));
+  state.caseId = draft?.id || newId();
+  state.startEdited = draft?.startEdited === true;
+  state.measurements = {...draft?.measurements, ...draft?.inputs};
   state.inputs = draft?.inputs || {};
   resetResults();
   el('terms-form').reset();
   for (const name of Object.keys(readTerms(el('terms-form')))) {
     el('terms-form').elements[name].value = draft?.terms?.[name] ?? '';
   }
-  intake.open(scenario, state.inputs, draft?.progress || {});
-  state.inputs = intake.snapshot().inputs;
-  lastIntakeInputs = JSON.stringify(state.inputs);
-  renderScenarios();
+  if (scenario) {
+    intake.open(scenario, state.inputs, draft?.progress || {});
+    state.inputs = intake.snapshot().inputs;
+    lastIntakeInputs = JSON.stringify(state.inputs);
+    rememberInputs();
+  }
+  quick.open(draft?.start ?? (scenario ? startFromIntake(scenario,intake.snapshot()) : {}));
   el('save-status').textContent = '';
-  let step = 2;
-  if (draft?.step >= 3) {
+  let step = draft?.step === 1 || !scenario ? 1 : 2;
+  if (scenario && !state.startEdited && (draft?.evaluated || draft?.step >= 3)) {
     const result = selectProducts(scenario, state.inputs, state.catalog);
     if (!result.missingInputs.length) {
       state.result = result;
@@ -210,14 +238,17 @@ function openCase(scenario, draft) {
       }
       state.option = draft.option;
       renderResults();
-      step = draft.step === 4 && getReadyOption() ? 4 : 3;
+      if (draft.step !== 1) step = draft.step === 4 && getReadyOption() ? 4 : 3;
     }
   }
+  // A loaded draft owns its own first screen even when the previous case was at another step.
+  if (step === 1) updateSteps(1);
   showStep(step);
+  showSavedCases();
 }
 
 function rememberCurrentCase() {
-  if (state.scenario) sessionCases.set(state.scenario, caseData());
+  if (state.caseId) sessionCases.set(state.caseId, caseData());
 }
 
 const intake = createIntake({
@@ -231,6 +262,7 @@ const intake = createIntake({
       lastIntakeInputs = serialized;
       state.inputs = next;
     }
+    rememberInputs();
     el('save-status').textContent = '';
     updatePreview();
   },
@@ -378,6 +410,19 @@ function renderAccessories(panel) {
   renderAccessoryList(panel);
 }
 
+function contextMarkup(progress) {
+  const {reactiveFee, billTotal, period} = progress.invoice ?? {};
+  const money = value => value == null || value === '' ? '' : value + ' zł';
+  return [
+    ['Okres z faktury', period],
+    ['Opłata za energię bierną', money(reactiveFee)],
+    ['Cała faktura', money(billTotal)],
+    ['Falowniki na obiekcie', {yes:'Tak', no:'Nie', unknown:'Do sprawdzenia'}[progress.siteInverters]],
+    ['Model obecnego falownika', progress.siteInverters === 'yes' && progress.quick?.inverterModel],
+  ].filter(([,value]) => value).map(([label,value]) =>
+    '<div><dt>' + text(label) + '</dt><dd>' + text(value) + '</dd></div>').join('');
+}
+
 function updatePreview() {
   const area = el('live-preview');
   if (!area) return;
@@ -388,7 +433,7 @@ function updatePreview() {
   document.querySelector('.workspace').dataset.stepActive = current;
   el('preview-draft').hidden = approved;
   area.querySelector('.preview-stage').textContent = approved ? 'Oferta robocza' : 'W przygotowaniu';
-  el('preview-topic').textContent = state.scenario ? goals[state.scenario][0] : 'Twoja oferta';
+  el('preview-topic').textContent = state.scenario ? goals[state.scenario] : 'Twoja oferta';
   el('preview-lines').innerHTML = rows.map(({candidate: {product}, quantity}) =>
     '<div class="preview-line"><strong>' + text(product.model) + '</strong><span>' + (quantity ? text(quantity) + ' szt.' : 'Ilość do ustalenia')
     + '</span><span>' + (product.priceSnapshot?.value > 0 ? text(amount(product.priceSnapshot.value, product.priceSnapshot.currency)) + ' / szt.' : 'Cena do potwierdzenia')
@@ -398,15 +443,9 @@ function updatePreview() {
     : current < 3 ? 'Tutaj pojawią się urządzenia, które wybierzesz po uzupełnieniu danych.' : 'Wskaż urządzenie i wpisz, ile sztuk przewiduje projekt.';
   const context = el('preview-context');
   const progress = state.scenario ? intake.snapshot().progress : {};
-  const {reactiveFee, billTotal, period} = progress.invoice || {};
-  const entries = [
-    ['Okres z faktury', period],
-    ['Opłata za energię bierną', reactiveFee && reactiveFee + ' zł'],
-    ['Cała faktura', billTotal && billTotal + ' zł'],
-    ['Falowniki na obiekcie', {yes:'Tak', no:'Nie', unknown:'Do sprawdzenia'}[progress.siteInverters]],
-  ].filter(([,value]) => value);
-  context.hidden = entries.length === 0;
-  context.innerHTML = entries.map(([label, value]) => '<div><dt>' + text(label) + '</dt><dd>' + text(value) + '</dd></div>').join('');
+  const entries = contextMarkup(progress);
+  context.hidden = !entries;
+  context.innerHTML = entries;
   el('preview-hint').textContent = progress.missingQuestion ? 'Czekasz na odpowiedź elektryka' : 'Zestawienie urządzeń';
   el('preview-draft').classList.toggle('empty-preview', !rows.length && !entries.length);
 }
@@ -615,6 +654,7 @@ function readTerms(form) {
 
 function renderQuote(option, terms, result) {
   const box = el('quote');
+  const context = contextMarkup(intake.snapshot().progress);
   const totals = result.totals.map((total) =>
     '<section class="totals"><h4>' + text(total.currency) + '</h4><dl class="specs">'
     + [
@@ -638,6 +678,7 @@ function renderQuote(option, terms, result) {
     + '<h4 id="commercial-title">Podsumowanie według walut</h4>' + totals + '</section>'
     + unresolvedRequirements(option.lines, true) + '<h4>Wskazane pozycje i dowody</h4>' + offerLines(option) + showPair(option.pair)
     + '<h4>Ograniczenia doboru i montażu</h4>' + list(state.result.checklist)
+    + (context ? '<details><summary>Dane z faktury i instalacji</summary><dl class="specs">' + context + '</dl></details>' : '')
     + '<details><summary>Sposób obliczeń</summary>' + list(result.formulas) + '</details>'
     + '<details><summary>Pomiary i źródła</summary>' + printMeasurements() + '</details>'
     + '<div class="actions"><button type="button" id="print-quote">Drukuj / zapisz PDF</button></div>';
@@ -652,25 +693,43 @@ document.querySelector('.workflow').addEventListener('click', (event) => {
   if (button && !button.disabled) showStep(Number(button.dataset.step));
 });
 
-el('scenarios').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-scenario]');
-  if (!button || !state.catalog) return;
-  if (state.scenario === button.dataset.scenario) { showStep(2); return; }
-  rememberCurrentCase();
-  openCase(button.dataset.scenario, sessionCases.get(button.dataset.scenario));
-});
+function continueStart(data, requestHelp = false) {
+  if (!state.catalog) return;
+  const scenario = scenarioFor(data.kinds);
+  if (!scenario) return;
+  if (scenario === state.scenario && !state.startEdited && !requestHelp && intake.snapshot().progress.quick) {
+    showStep(2);
+    return;
+  }
+  const draft = caseData();
+  const inputs = mergeStartInputs(state.measurements, data);
+  const invoice = {...draft.progress.invoice, billTotal:data.billTotal, reactiveFee:data.reactiveFee};
+  const progress = {quick:data, siteInverters:data.siteInverters, invoice, requestHelp};
+  openCase(scenario, {...draft, step:2, evaluated:false, startEdited:false, option:null, lines:[],
+    inputs, measurements:inputs, start:data, progress});
+}
 
-el('start-invoice').addEventListener('click', () => {
-  el('scenarios').querySelector('[data-scenario="compensation"]')?.click();
+const quick = createQuickStart(el('quick-start'), {
+  onContinue: data => continueStart(data),
+  onInvoice: data => continueStart(data),
+  onUnknown: data => continueStart(data,true),
+  onChange(data) {
+    if (!state.caseId && hasQuickData(data)) state.caseId = newId();
+    state.startEdited = true;
+    resetResults();
+    el('case-tools').hidden = !state.caseId;
+    el('save-status').textContent = '';
+  },
 });
 el('saved-cases').addEventListener('click', event => {
   const button = event.target.closest('[data-resume-case]');
   if (!button) return;
-  const row = readCases().find(item => item.id === button.dataset.resumeCase);
-  if (!row) return;
   rememberCurrentCase();
-  const inSession = sessionCases.get(row.scenario);
-  openCase(row.scenario, inSession?.id === row.id ? inSession : row);
+  const id = button.dataset.resumeCase;
+  const saved = readCases().find(item => item.id === id);
+  const local = sessionCases.get(id);
+  const row = local && (!saved || local.updated >= saved.updated) ? local : saved;
+  if (row) openCase(row.scenario, row);
 });
 
 document.querySelector('[data-save-case]').addEventListener('click', saveCase);
@@ -678,15 +737,18 @@ window.addEventListener('storage', event => {
   if (event.key === null || event.key.startsWith(draftsKey)) showSavedCases();
 });
 el('new-case').addEventListener('click', () => {
-  if (state.scenario && !saveCase()) return;
+  if (state.caseId && !saveCase()) return;
   state.scenario = null;
   state.caseId = null;
-  sessionCases.clear();
+  state.startEdited = false;
+  state.measurements = {};
   state.inputs = {};
   resetResults();
   el('terms-form').reset();
-  renderScenarios();
+  quick.open({});
+  el('save-status').textContent = '';
   showStep(1);
+  showSavedCases();
 });
 
 el('results').addEventListener('input', (event) => {
@@ -723,13 +785,15 @@ el('go-terms').addEventListener('click', () => showStep(4));
 
 function downloadDraft() {
   const options = makeOfferOptions();
+  const row = caseData();
   const snapshot = {
     status: 'Dane robocze do przeglądu',
-    version: 1,
+    version: 2,
+    start: row.start,
     catalogueDate: state.catalog.snapshotDate,
     scenario: state.scenario,
-    inputs: intake.snapshot().inputs,
-    progress: intake.snapshot().progress,
+    inputs: row.inputs,
+    progress: row.progress,
     installationApproval: false,
     selectedOptions: options.map((option) => ({
       name: optionLabel(option),
@@ -815,7 +879,7 @@ async function start() {
     state.catalog = await loadCatalog({ pdfFactsById, blockedFieldsById, compatibilityPairs });
     status.hidden = true;
     el('catalog-date').textContent = 'Katalog Aniro / ' + state.catalog.snapshotDate + ' / ' + state.catalog.products.length + ' pozycji';
-    renderScenarios();
+    el('quick-start').inert = false;
     showSavedCases();
     updatePreview();
   } catch {

@@ -137,3 +137,21 @@ test("rozwiązanie łączone zachowuje trzy niezależne grupy i ręczny etap odb
   assert.ok(result.checklist.some((item) => item.includes("kompensatora z układem")));
   assert.ok(result.groups.every(({ candidates }) => candidates.every((item) => !("quantity" in item))));
 });
+
+test("kompensacja z pojedynczą klasą energii nie wymaga danych trzeciej klasy ani nie tworzy pary", () => {
+  for (const [scenario, values, kind, requiredField, absentField] of [
+    ["compensation-inverter", { ...comp, ...inverter, inverterUse: "grid" }, "inverter", "acPowerKw", "capacityKwh"],
+    ["compensation-storage", { ...comp, ...storage }, "storage", "capacityKwh", "acPowerKw"],
+  ]) {
+    const fields = getInputFields(scenario).map(({ id }) => id);
+    assert.ok(fields.includes(requiredField));
+    assert.ok(!fields.includes(absentField));
+    const inputs = withSources(values);
+    inputs[absentField] = { value: 10, source: "Obca klasa produktu" };
+    const result = selectProducts(scenario, inputs, catalog);
+    assert.equal(result.status, "review-required");
+    assert.deepEqual(result.groups.map(({ kind }) => kind), ["compensator", kind]);
+    assert.deepEqual(result.compatibility, []);
+    assert.equal(result.inputs[absentField], undefined);
+  }
+});

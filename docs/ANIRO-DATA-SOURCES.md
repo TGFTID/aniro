@@ -55,3 +55,13 @@ Silnik wykrył łącznie 10 różnic między listami harmonicznych w opisie i w 
 Strona 1 obejmuje 14 modeli L22/L25/L29.9/L30/L40/L42.5/L50 w odmianach `-TH` i `-TH-S`, PPM typu A, oprogramowanie V100, zestaw „PL: NC RFG”. Dokument podaje daty 23.09.2026 oraz 22.09.2031. Tabela A.1 na s. 2 zapisuje „Do wydania / Pending issue”, a uwagi na tej stronie uzależniają ważność od weryfikacji u wystawcy. Sam plik służy do stwierdzenia zakresu dokumentu. Aktualny status u wystawcy wymaga sprawdzenia przed użyciem.
 
 Załącznik wskazuje badania typu, NC RfG, WOS 2025-05, WiPWC 1.3 i Bank Nastaw 1.1. Na s. 4 przyłącze SN jest poza zakresem. Wykaz częściowej certyfikacji SunSpec na s. 5 wymienia modele informacyjne 1, 703 i 704. Na s. 6 wyniki pozytywne typu A obejmują zakres częstotliwości, odporność RoCoF, zdalne zaprzestanie generacji i LFSM-O. Na s. 7 wskazano bank nastaw, rejestr co najmniej 500 wpisów, RS-485/Modbus RTU i wymagania weryfikacji na poziomie projektu. Schemat zabezpieczeń instalacji jest poza zakresem oceny. Wpis certyfikacyjny nie przesądza o interoperacyjności z baterią ani o odbiorze przyłącza. S4, s. 1–7.
+
+## Zdjęcia kart na ekranie startowym
+
+Zdjęcia pochodzą z publicznych rekordów katalogu Aniro. Każde ilustruje kategorię urządzeń. Dopiero ankieta i porównanie parametrów wskazują konkretne modele.
+
+| Plik w aplikacji | ID katalogowe ilustracji | Zdjęcie producenta |
+|---|---|---|
+| quick-inverter.png | 662a3c0459692e0012ad9e2a | [Sinexcel Isuna](https://pliki.aniro.pl/Falowniki_PV/Isuna_1.png) |
+| quick-storage.png | 662a3c0459692e0012ad9e81 | [Sunwoda](https://pliki.aniro.pl/Magazyny_Energii/sunwoda_CIESS.png) |
+| quick-compensator.png | 66ab2fea59692e001228a1c9 | [ASVG Cabinet](https://pliki.aniro.pl/SVG/ASVG_15_CABINET.png) |

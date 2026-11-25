@@ -186,6 +186,20 @@
   .preview-line > strong { grid-column: auto; }
 }
 
+/* Keep the start sheet and its four values together on narrow screens. */
+@media screen {
+  #main:has(.workspace[data-step-active="1"]) { max-width: 1040px; }
+  .workspace[data-step-active="1"] { grid-template-columns: minmax(0, 1fr); margin-block-start: clamp(10px, 2vw, 24px); }
+  .workspace[data-step-active="1"] :is(.workflow, .preview) { display: none; }
+  .workspace-bar:has(+ .workspace[data-step-active="1"]) #stage-label { display: none; }
+  .workspace-bar:has(+ .workspace[data-step-active="1"]):has(#save-status:empty) { display: none; }
+  #step-1 { padding: clamp(12px, 2.5vw, 28px); }
+  #saved-cases:not([hidden]) { padding-block-start: 16px; margin-block: 16px 0; border-top: 1px solid var(--border); }
+}
+@media screen and (max-width: 520px) {
+  #main:has(.workspace[data-step-active="1"]) { padding-inline: 10px; }
+}
+
 @page { size: A4; margin: 12mm; }
 
 @media print {
@@ -195,6 +209,11 @@
   .quote .document-head { margin-block-end: 4mm; padding-block-end: 3mm; }
   .quote .brand-logo { width: 27mm; print-color-adjust: exact; }
   .quote h3 { font-size: 16pt; }
+  .quote :is(h4, summary) { margin-block: 1.5mm .75mm; }
+  .quote .specs div { padding-block: .65mm; }
+  .quote details > .specs, .quote .inline-list { margin-block-end: 1.5mm; }
+  .quote details:has(.specs) { break-inside: avoid; }
+
   .quote-items { margin-block: 3mm; font-size: inherit; }
   .quote-items caption { margin-bottom: 1mm; font-size: 11pt; break-after: avoid; }
   .quote-items :is(th, td) { padding: 1.2mm; }
