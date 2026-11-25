@@ -9,32 +9,31 @@
   <title>Aniro | Dobór urządzeń</title>
   <link rel="stylesheet" href="./src/tokens.css">
   <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/workspace.css">
   <script type="module" src="./src/ui.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
   <header class="topbar">
     <div class="shell brand-row">
-      <span class="brand"><span class="brand-mark" aria-hidden="true"></span>Aniro</span>
-      <span class="brand-section">Dobór urządzeń</span>
+      <img class="brand-logo main-logo" src="./src/aniro-logo.png" alt="Aniro" width="135" height="34">
+      <h1 class="brand-section">Generator ofert</h1>
+      <div id="case-tools" class="case-tools" hidden>
+        <button type="button" data-save-case>Zapisz sprawę</button>
+        <button type="button" id="new-case">Nowa sprawa</button>
+      </div>
     </div>
   </header>
 
   <main id="main" class="shell">
-    <header class="intro">
-      <div>
-        <h1>Dobór urządzeń dla obiektu</h1>
-        <p>Kompensacja mocy biernej, magazyny energii i falowniki z katalogu Aniro.</p>
-      </div>
-      <div class="circuit" aria-hidden="true"><span></span><span></span><span></span></div>
-    </header>
-
+    <div class="workspace-bar"><span id="stage-label">Nowa sprawa</span><span id="save-status" role="status"></span></div>
     <div class="workspace">
+      <div class="editor">
       <nav aria-label="Etapy doboru" class="workflow">
         <ol>
           <li><button type="button" data-step="1" aria-current="step"><span>1</span>Potrzeba</button></li>
-          <li><button type="button" data-step="2" disabled><span>2</span>Pomiary</button></li>
-          <li><button type="button" data-step="3" disabled><span>3</span>Warianty</button></li>
+          <li><button type="button" data-step="2" disabled><span>2</span>Dane</button></li>
+          <li><button type="button" data-step="3" disabled><span>3</span>Pozycje</button></li>
           <li><button type="button" data-step="4" disabled><span>4</span>Oferta</button></li>
         </ol>
       </nav>
@@ -43,25 +42,25 @@
         <p id="catalog-status" class="notice" role="status">Ładowanie katalogu Aniro…</p>
         <noscript><p class="notice alert">Włącz JavaScript, aby wczytać katalog i przejść przez dobór.</p></noscript>
         <section id="step-1" class="step" aria-labelledby="title-1">
-          <h2 id="title-1" tabindex="-1">Czego potrzebuje obiekt?</h2>
-          <p>Wybierz zadanie, aby zobaczyć wymagane dane.</p>
+          <div id="saved-cases" hidden></div>
+          <h2 id="title-1" tabindex="-1">Od czego chcesz zacząć?</h2>
           <div id="scenarios" class="choices"></div>
-          <div id="accessories"></div>
+          <details class="start-help"><summary>Nie wiem, od czego zacząć</summary>
+            <p>Jeśli na rozliczeniu dystrybucji widzisz opłatę za energię bierną, zacznij od faktury. Przy panelach i nadwyżkach energii wybierz magazyn. Jeśli instalator wskazał urządzenia, możesz samodzielnie wybrać zakres z listy powyżej.</p>
+            <button type="button" id="start-invoice">Zacznij od faktury</button>
+          </details>
         </section>
 
         <section id="step-2" class="step" aria-labelledby="title-2" hidden>
-          <h2 id="title-2" tabindex="-1">Pomiary i wymagania</h2>
-          <p>Wpisz wartości i ich źródła. Źródłem może być pomiar z datą lub dokument i numer strony.</p>
-          <form id="measurements" novalidate>
-            <div id="fields" class="measurement-list"></div>
-            <div id="input-errors" class="notice alert" role="alert" hidden></div>
-            <div class="actions"><button type="submit" class="primary">Sprawdź dane i warianty</button><button type="button" data-save-draft>Pobierz dane robocze</button></div>
-          </form>
+          <h2 id="title-2" tabindex="-1">Dane do oferty</h2>
+          <form id="measurements" novalidate><div id="fields" class="measurement-list"></div></form>
+          <div id="input-errors" class="notice alert" role="alert" hidden></div>
+          <div class="export-link"><button type="button" data-save-draft>Pobierz dane robocze</button></div>
         </section>
 
         <section id="step-3" class="step" aria-labelledby="title-3" hidden>
-          <h2 id="title-3" tabindex="-1">Warianty i weryfikacja</h2>
-          <p>Porównaj parametry i wybierz pozycje do kalkulacji. Przed potwierdzeniem sprawdź montaż i zgodność.</p>
+          <h2 id="title-3" tabindex="-1">Wybierz pozycje do oferty</h2>
+          <p>Porównaj modele, wybierz urządzenie i podaj potrzebną liczbę sztuk.</p>
           <div id="results"></div>
           <div id="selected" tabindex="-1"></div>
           <p id="selection-status" class="notice" role="status" hidden></p>
@@ -106,9 +105,22 @@
             <p id="quote-error" class="notice alert" role="alert" hidden></p>
             <div class="actions"><button type="submit" class="primary">Przygotuj ofertę roboczą</button><button type="button" data-save-draft>Pobierz dane robocze</button></div>
           </form>
-          <section id="quote" class="quote" aria-labelledby="quote-title" hidden></section>
+
         </section>
       </div>
+      </div>
+      <aside id="live-preview" class="preview" aria-label="Podgląd oferty">
+        <header class="preview-heading"><h2>Podgląd oferty</h2><span class="preview-stage">W przygotowaniu</span></header>
+        <div id="preview-draft" class="preview-paper">
+          <div class="paper-brand"><img class="brand-logo" src="./src/aniro-logo.png" alt="Aniro" width="92" height="23"></div>
+          <h3 id="preview-topic">Twoja oferta</h3>
+          <h4 id="preview-hint">Zestawienie urządzeń</h4>
+          <div id="preview-lines"></div>
+          <p id="preview-note">Tutaj pojawią się urządzenia, które wybierzesz po uzupełnieniu danych.</p>
+          <dl id="preview-context" hidden></dl>
+        </div>
+        <section id="quote" class="quote preview-paper" aria-labelledby="quote-title" hidden></section>
+      </aside>
     </div>
 
     <footer class="footer"><span id="catalog-date">Katalog Aniro</span><nav aria-label="Dokumentacja"><a class="source-link" href="./docs/ANIRO-DATA-SOURCES.md">Źródła danych</a><a class="source-link" href="./docs/ANIRO-SELECTION-RULES.md">Zasady doboru</a></nav><span id="version"></span></footer>

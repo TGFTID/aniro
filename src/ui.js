@@ -1,3 +1,4 @@
+import { createIntake } from './intake.js';
 import { loadCatalog } from './catalog.js';
 import { SCENARIOS, getInputFields, selectProducts, getAccessoryOptions } from './selection.js';
 import { quote } from './pricing.js';
@@ -25,7 +26,7 @@ const statusLabels = {
   manual: 'Do ręcznej weryfikacji',
   fails: 'Poza wymaganiami',
 };
-const state = { catalog: null, scenario: null, inputs: {}, result: null, selected: new Map(), option: null };
+const state = { catalog: null, scenario: null, inputs: {}, result: null, selected: new Map(), option: null, caseId: null };
 
 const el = (id) => document.getElementById(id);
 const text = (value = '') => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -75,10 +76,16 @@ function updateSteps(current) {
 }
 
 function showStep(step) {
+  if (step !== 4 && !el('quote').hidden) invalidateQuote();
   for (const panel of document.querySelectorAll('.step')) panel.hidden = panel.id !== 'step-' + step;
   updateSteps(step);
   if (step === 4) renderScopeSummary();
-  el('title-' + step).focus();
+  el('input-errors').hidden = true;
+  el('stage-label').textContent = state.scenario ? goals[state.scenario][0] : 'Nowa sprawa';
+  el('case-tools').hidden = !state.scenario;
+  updatePreview();
+  el('title-' + step).focus({preventScroll:true});
+  window.scrollTo(0, 0);
 }
 
 function currentStep() {
@@ -102,63 +109,146 @@ function resetResults() {
   updateSteps(2);
 }
 
+const goals = {
+  compensation: ['Mam na fakturze opłatę za energię bierną', 'Sprawdź pozycję w rozliczeniu dystrybucji.'],
+  storage: ['Chcę magazynować energię z paneli', 'Dobierz magazyn do potrzeb obiektu.'],
+  inverter: ['Szukam falownika', 'Porównaj modele dla swojej instalacji.'],
+  'storage-inverter': ['Chcę magazyn z falownikiem', 'Sprawdź, które urządzenia mogą pracować razem.'],
+  combined: ['Chcę rozpatrzyć wszystkie urządzenia', 'Przygotuj osobne warianty dla kilku potrzeb.'],
+};
 function renderScenarios() {
-  el('scenarios').innerHTML = SCENARIOS.map(({ id, label, description }) =>
-    '<button type="button" class="choice" data-scenario="' + text(id) + '" aria-pressed="' + (id === state.scenario) + '">'
-      + '<strong>' + text(label) + '</strong><small>' + text(description) + '</small></button>'
-  ).join('');
-}
-
-function valueField(field, value) {
-  const name = 'name="' + text(field.id) + '" id="field-' + text(field.id) + '"';
-  if (field.type === 'select') {
-    return '<select ' + name + '><option value="">Wybierz…</option>' + field.options.map((option) =>
-      '<option value="' + text(option.value) + '"' + (String(value) === String(option.value) ? ' selected' : '') + '>'
-      + text(option.label) + '</option>'
-    ).join('') + '</select>';
-  }
-  const number = field.type === 'number';
-  return '<input ' + name + ' type="' + (number ? 'number" step="any"' : 'text"')
-    + (typeof field.min === 'number' ? ' min="' + field.min + '"' : '')
-    + ' value="' + text(value) + '">';
-}
-
-function renderMeasurements() {
-  const fields = getInputFields(state.scenario);
-  el('fields').innerHTML = fields.map((field) => {
-    const entered = state.inputs[field.id] ?? {};
-    return '<fieldset class="measurement" data-field="' + text(field.id) + '"><legend>' + text(field.label)
-      + (field.unit ? ' (' + text(field.unit) + ')' : '') + '</legend>'
-      + (field.hint ? '<p class="muted">' + text(field.hint) + '</p>' : '')
-      + '<div class="fields-row"><label>Wartość' + valueField(field, entered.value) + '</label>'
-      + '<label>Źródło<input type="text" name="' + text(field.id) + '-source" value="' + text(entered.source) + '"></label></div></fieldset>';
+  el('scenarios').innerHTML = SCENARIOS.map(({ id }) => {
+    const [label, description] = goals[id];
+    return '<button type="button" class="choice" data-scenario="' + id + '" aria-pressed="' + (id === state.scenario) + '">'
+      + '<span><strong>' + label + '</strong><small>' + description + '</small></span><span aria-hidden="true">›</span></button>';
   }).join('');
-  el('input-errors').hidden = true;
-  toggleConditionalFields();
 }
 
-function toggleConditionalFields() {
-  const form = el('measurements');
-  for (const field of getInputFields(state.scenario)) {
-    if (!field.when) continue;
-    const hidden = form.elements.namedItem(field.when.id).value !== field.when.value;
-    const wrapper = form.querySelector('[data-field="' + field.id + '"]');
-    wrapper.hidden = hidden;
-    wrapper.disabled = hidden;
+const draftsKey = 'aniro.cases.v1';
+const casePrefix = draftsKey + '.';
+const sessionCases = new Map();
+let lastIntakeInputs = '';
+
+function readCases() {
+  const rows = JSON.parse(localStorage.getItem(draftsKey) || '[]');
+  if (!Array.isArray(rows)) throw new Error('Nieczytelny zapis');
+  const byId = new Map(rows.filter(row => row?.id).map(row => [row.id, row]));
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(casePrefix)) continue;
+    const row = JSON.parse(localStorage.getItem(key));
+    if (row?.id && key === casePrefix + row.id) byId.set(row.id, row);
+  }
+  return [...byId.values()].filter(row => row.version === 1 && Object.hasOwn(goals, row.scenario))
+    .sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+}
+
+function showSavedCases() {
+  const area = el('saved-cases');
+  try {
+    const rows = readCases();
+    area.hidden = !rows.length;
+    area.innerHTML = '<h3>Zapisane sprawy</h3>' + rows.map(row =>
+      '<button type="button" class="resume-row" data-resume-case="' + text(row.id) + '"><span><strong>'
+      + text(goals[row.scenario][0]) + '</strong><small>' + text(new Date(row.updated).toLocaleString('pl-PL'))
+      + '</small></span><span>Wznów ›</span></button>').join('');
+  } catch {
+    area.hidden = false;
+    area.textContent = 'Nie udało się odczytać zapisanych spraw w tej przeglądarce.';
   }
 }
 
-function readMeasurements() {
-  const form = el('measurements');
-  const fields = getInputFields(state.scenario);
-  return Object.fromEntries(fields.filter((field) =>
-    !field.when || form.elements.namedItem(field.when.id).value === field.when.value
-  ).map(({ id, type }) => {
-    const control = form.elements.namedItem(id);
-    const value = type === 'number' && control.value !== '' ? control.valueAsNumber : control.value.trim();
-    return [id, { value, source: form.elements.namedItem(id + '-source').value.trim() }];
-  }));
+function caseData() {
+  const { inputs, progress } = intake.snapshot();
+  return {
+    version: 1, id: state.caseId, scenario: state.scenario, inputs, progress,
+    step: currentStep() === 1 ? (state.result ? 3 : 2) : currentStep(), updated: new Date().toISOString(), catalogDate: state.catalog.snapshotDate,
+    lines: [...state.selected.values()].map(({candidate, quantity, quantitySource, technicalSource}) =>
+      ({id: candidate.product.id, quantity, quantitySource, technicalSource})),
+    option: state.option, terms: readTerms(el('terms-form')),
+  };
 }
+
+function saveCase() {
+  if (!state.scenario) return false;
+  try {
+    const row = caseData();
+    localStorage.setItem(casePrefix + row.id, JSON.stringify(row));
+    el('save-status').textContent = 'Sprawa zapisana w tej przeglądarce.';
+    showSavedCases();
+    return true;
+  } catch {
+    el('save-status').textContent = 'Zapis w przeglądarce nie powiódł się. Pobierz dane robocze, aby zachować kopię.';
+    return false;
+  }
+}
+
+function openCase(scenario, draft) {
+  state.scenario = scenario;
+  state.caseId = draft?.id || (globalThis.crypto?.randomUUID?.() ?? Date.now() + '-' + Math.random().toString(36).slice(2));
+  state.inputs = draft?.inputs || {};
+  resetResults();
+  el('terms-form').reset();
+  for (const name of Object.keys(readTerms(el('terms-form')))) {
+    el('terms-form').elements[name].value = draft?.terms?.[name] ?? '';
+  }
+  intake.open(scenario, state.inputs, draft?.progress || {});
+  state.inputs = intake.snapshot().inputs;
+  lastIntakeInputs = JSON.stringify(state.inputs);
+  renderScenarios();
+  el('save-status').textContent = '';
+  let step = 2;
+  if (draft?.step >= 3) {
+    const result = selectProducts(scenario, state.inputs, state.catalog);
+    if (!result.missingInputs.length) {
+      state.result = result;
+      state.inputs = result.inputs;
+      for (const line of draft.lines || []) {
+        const candidate = findCandidate(line.id);
+        if (candidate && candidate.status !== 'fails') state.selected.set(candidate.product.kind,
+          {candidate, quantity: String(line.quantity ?? ''), quantitySource: String(line.quantitySource ?? ''), technicalSource: String(line.technicalSource ?? '')});
+      }
+      state.option = draft.option;
+      renderResults();
+      step = draft.step === 4 && getReadyOption() ? 4 : 3;
+    }
+  }
+  showStep(step);
+}
+
+function rememberCurrentCase() {
+  if (state.scenario) sessionCases.set(state.scenario, caseData());
+}
+
+const intake = createIntake({
+  form: el('measurements'), fields: el('fields'), onSave: saveCase,
+  onBack() { showStep(1); },
+  onChange() {
+    const next = intake.snapshot().inputs;
+    const serialized = JSON.stringify(next);
+    if (serialized !== lastIntakeInputs) {
+      resetResults();
+      lastIntakeInputs = serialized;
+      state.inputs = next;
+    }
+    el('save-status').textContent = '';
+    updatePreview();
+  },
+  onComplete(inputs) {
+    state.inputs = inputs;
+    const result = selectProducts(state.scenario, inputs, state.catalog);
+    if (result.missingInputs.length) {
+      const errors = el('input-errors');
+      errors.textContent = result.missingInputs.map(item => item.label + ' — ' + item.reason).join('. ');
+      errors.hidden = false;
+      return;
+    }
+    el('input-errors').hidden = true;
+    state.result = result;
+    renderResults();
+    showStep(3);
+  },
+});
 
 function printMeasurements() {
   const fields = getInputFields(state.scenario);
@@ -288,6 +378,39 @@ function renderAccessories(panel) {
   renderAccessoryList(panel);
 }
 
+function updatePreview() {
+  const area = el('live-preview');
+  if (!area) return;
+  const chosen = chosenOption();
+  const rows = chosen?.lines ?? [...state.selected.values()];
+  const current = state.scenario ? currentStep() : 1;
+  const approved = current === 4 && !el('quote').hidden;
+  document.querySelector('.workspace').dataset.stepActive = current;
+  el('preview-draft').hidden = approved;
+  area.querySelector('.preview-stage').textContent = approved ? 'Oferta robocza' : 'W przygotowaniu';
+  el('preview-topic').textContent = state.scenario ? goals[state.scenario][0] : 'Twoja oferta';
+  el('preview-lines').innerHTML = rows.map(({candidate: {product}, quantity}) =>
+    '<div class="preview-line"><strong>' + text(product.model) + '</strong><span>' + (quantity ? text(quantity) + ' szt.' : 'Ilość do ustalenia')
+    + '</span><span>' + (product.priceSnapshot?.value > 0 ? text(amount(product.priceSnapshot.value, product.priceSnapshot.currency)) + ' / szt.' : 'Cena do potwierdzenia')
+    + '</span></div>').join('');
+  el('preview-note').textContent = approved ? 'Zatwierdzona kalkulacja jest gotowa do wydruku.'
+    : rows.length ? 'Ceny jednostkowe z katalogu z ' + state.catalog.snapshotDate + '. Warunki handlowe zatwierdzisz przed wydrukiem.'
+    : current < 3 ? 'Tutaj pojawią się urządzenia, które wybierzesz po uzupełnieniu danych.' : 'Wskaż urządzenie i wpisz, ile sztuk przewiduje projekt.';
+  const context = el('preview-context');
+  const progress = state.scenario ? intake.snapshot().progress : {};
+  const {reactiveFee, billTotal, period} = progress.invoice || {};
+  const entries = [
+    ['Okres z faktury', period],
+    ['Opłata za energię bierną', reactiveFee && reactiveFee + ' zł'],
+    ['Cała faktura', billTotal && billTotal + ' zł'],
+    ['Falowniki na obiekcie', {yes:'Tak', no:'Nie', unknown:'Do sprawdzenia'}[progress.siteInverters]],
+  ].filter(([,value]) => value);
+  context.hidden = entries.length === 0;
+  context.innerHTML = entries.map(([label, value]) => '<div><dt>' + text(label) + '</dt><dd>' + text(value) + '</dd></div>').join('');
+  el('preview-hint').textContent = progress.missingQuestion ? 'Czekasz na odpowiedź elektryka' : 'Zestawienie urządzeń';
+  el('preview-draft').classList.toggle('empty-preview', !rows.length && !entries.length);
+}
+
 function productCard(candidate) {
   const { product, status, checks } = candidate;
   const picked = state.selected.get(product.kind)?.candidate.product.id === product.id;
@@ -298,9 +421,10 @@ function productCard(candidate) {
     + '<h4>' + text(product.model) + '</h4><p class="meta">' + text(subtitle) + '</p></div>'
     + '<p class="grade ' + text(status) + '">' + text(statusLabels[status]) + '</p></div>' + conflict
     + snapshot(product)
+    + '<p class="fit-summary">' + text((checks.find(check => check.status === 'manual' || check.status === 'fails') ?? checks[0])?.reason ?? '') + '</p>'
     + '<details><summary>Parametry i źródła</summary><div class="variant-detail">' + productDetails(product, checks) + '</div></details>'
     + (status === 'fails' ? '' : '<button type="button" data-pick="' + text(product.id) + '" aria-pressed="' + picked + '">'
-      + (picked ? 'Usuń z zestawienia' : 'Wskaż wariant') + '</button>') + '</article>';
+      + (picked ? 'Usuń z zestawienia' : 'Dodaj do pozycji') + '</button>') + '</article>';
 }
 
 function renderCandidateGroups() {
@@ -315,7 +439,7 @@ function renderCandidateGroups() {
     const excluded = filtered.filter(({ status }) => status === 'fails');
     return '<section class="variants"><h3>' + text(labels[kind]) + '</h3>'
       + (!filtered.length ? '<p class="muted">Brak pozycji dla wybranych filtrów.</p>' : '')
-      + visible.slice(0, 4).map(productCard).join('')
+      + '<div class="model-list">' + visible.slice(0, 4).map(productCard).join('') + '</div>'
       + (visible.length > 4 ? '<details class="review"><summary>Pokaż pozostałe modele ('
         + (visible.length - 4) + ')</summary>' + visible.slice(4).map(productCard).join('') + '</details>' : '')
       + (excluded.length ? '<details class="review"' + (wantedStatus === 'fails' || query ? ' open' : '') + '><summary>Poza wymaganiami ('
@@ -326,8 +450,8 @@ function renderCandidateGroups() {
 function renderResults() {
   const { checklist } = state.result;
   el('results').innerHTML = '<details class="review"><summary>Dane użyte do porównania</summary>' + printMeasurements() + '</details>'
-    + '<div class="notice"><strong>Wynik roboczy</strong><p>Porównanie katalogowe wymaga przeglądu technicznego. Ilości i pozycje wskaż samodzielnie.</p></div>'
-    + (checklist.length ? '<details class="review" open><summary>Checklista weryfikacji technicznej</summary>' + list(checklist) + '</details>' : '')
+
+    + (checklist.length ? '<details class="review"><summary>Co trzeba jeszcze sprawdzić?</summary>' + list(checklist) + '</details>' : '')
     + '<a id="selection-jump" href="#selected" class="source-link" hidden>Przejdź do wskazanych pozycji</a>'
     + '<div class="columns"><label>Znajdź model<input type="search" id="find-model" placeholder="Model lub producent"></label>'
     + '<label>Wynik porównania<select id="find-status"><option value="">Wszystkie</option>'
@@ -425,8 +549,8 @@ function renderSelected() {
   const options = makeOfferOptions();
   const pair = matchPair();
   area.innerHTML = '<h3>Wskazane pozycje</h3>' + showPair(pair)
-    + unresolvedRequirements([...state.selected.values()])
     + [...state.selected.entries()].map(([kind, line]) => renderPickedLine(kind, line)).join('')
+    + unresolvedRequirements([...state.selected.values()])
     + (options.length > 1 ? '<fieldset class="measurement"><legend>Wariant do oferty</legend>'
       + '<p class="muted">Pozycje tworzą rozłączne warianty. Wybierz jeden do rozliczenia.</p>'
       + options.map((option) => '<div class="confirm option"><label><input type="radio" name="offer-option" value="' + text(option.id) + '"'
@@ -453,6 +577,7 @@ function updateSelectionStatus() {
       : 'Uzupełnij poprawną ilość, jej podstawę i wymagane źródło weryfikacji.';
   }
   updateSteps(currentStep());
+  updatePreview();
 }
 
 function renderScopeSummary() {
@@ -498,12 +623,17 @@ function renderQuote(option, terms, result) {
     ].map(([label, value]) => '<div><dt>' + label + '</dt><dd>' + text(amount(value, total.currency)) + '</dd></div>').join('')
     + '</dl></section>'
   ).join('');
-  box.innerHTML = '<h3 id="quote-title" tabindex="-1">Oferta robocza Aniro</h3>'
+  box.innerHTML = '<div class="document-head"><span class="paper-brand"><img class="brand-logo" src="./src/aniro-logo.png" alt="Aniro" width="92" height="23"></span><span>Katalog ' + text(state.catalog.snapshotDate) + '</span></div><h3 id="quote-title" tabindex="-1">Oferta robocza Aniro</h3>'
     + '<p class="muted">Kalkulacja wskazanego zakresu. Dobór i montaż wymagają potwierdzenia dla obiektu.</p>'
     + '<dl class="specs"><div><dt>Zakres</dt><dd>' + text(terms.scope) + '</dd></div>'
     + '<div><dt>Źródło warunków handlowych</dt><dd>' + text(terms.commercialSource) + '</dd></div>'
     + '<div><dt>Ceny katalogowe</dt><dd>' + (terms.priceBasis === 'net' ? 'Netto' : 'Brutto') + '</dd></div>'
     + '<div><dt>VAT / rabat</dt><dd>' + text(terms.vatRate) + '% / ' + text(terms.discountRate) + '%</dd></div></dl>'
+    + '<table class="quote-items"><caption>Pozycje oferty</caption><thead><tr><th>Urządzenie</th><th>Szt.</th><th>Cena jedn. '
+    + (terms.priceBasis === 'net' ? 'netto' : 'brutto') + '</th></tr></thead><tbody>'
+    + option.lines.map(({candidate:{product},quantity}) => '<tr><td>' + text(product.model) + '</td><td>' + text(quantity)
+      + '</td><td>' + text(amount(product.priceSnapshot.value, product.priceSnapshot.currency)) + '</td></tr>').join('')
+    + '</tbody></table>'
     + '<section class="commercial-summary" aria-labelledby="commercial-title">'
     + '<h4 id="commercial-title">Podsumowanie według walut</h4>' + totals + '</section>'
     + unresolvedRequirements(option.lines, true) + '<h4>Wskazane pozycje i dowody</h4>' + offerLines(option) + showPair(option.pair)
@@ -512,6 +642,7 @@ function renderQuote(option, terms, result) {
     + '<details><summary>Pomiary i źródła</summary>' + printMeasurements() + '</details>'
     + '<div class="actions"><button type="button" id="print-quote">Drukuj / zapisz PDF</button></div>';
   box.hidden = false;
+  updatePreview();
   el('print-quote').addEventListener('click', () => window.print());
   el('quote-title').focus();
 }
@@ -524,40 +655,38 @@ document.querySelector('.workflow').addEventListener('click', (event) => {
 el('scenarios').addEventListener('click', (event) => {
   const button = event.target.closest('[data-scenario]');
   if (!button || !state.catalog) return;
-  if (button.dataset.scenario !== state.scenario) {
-    state.scenario = button.dataset.scenario;
-    state.inputs = {};
-    resetResults();
-    renderScenarios();
-    renderMeasurements();
-  }
-  showStep(2);
+  if (state.scenario === button.dataset.scenario) { showStep(2); return; }
+  rememberCurrentCase();
+  openCase(button.dataset.scenario, sessionCases.get(button.dataset.scenario));
 });
 
-el('measurements').addEventListener('input', () => {
-  state.inputs = readMeasurements();
-  resetResults();
-  el('input-errors').hidden = true;
-  toggleConditionalFields();
+el('start-invoice').addEventListener('click', () => {
+  el('scenarios').querySelector('[data-scenario="compensation"]')?.click();
 });
-el('measurements').addEventListener('submit', (event) => {
-  event.preventDefault();
-  state.inputs = readMeasurements();
-  const result = selectProducts(state.scenario, state.inputs, state.catalog);
-  if (result.missingInputs.length) {
-    const errors = el('input-errors');
-    errors.innerHTML = '<strong>Uzupełnij dane przed doborem</strong>'
-      + list(result.missingInputs.map(({ label, reason }) => label + ': ' + reason));
-    errors.hidden = false;
-    const first = result.missingInputs[0];
-    const name = first.reason.includes('źródło') ? first.id + '-source' : first.id;
-    el('measurements').elements.namedItem(name)?.focus();
-    return;
-  }
-  el('input-errors').hidden = true;
-  state.result = result;
-  renderResults();
-  showStep(3);
+el('saved-cases').addEventListener('click', event => {
+  const button = event.target.closest('[data-resume-case]');
+  if (!button) return;
+  const row = readCases().find(item => item.id === button.dataset.resumeCase);
+  if (!row) return;
+  rememberCurrentCase();
+  const inSession = sessionCases.get(row.scenario);
+  openCase(row.scenario, inSession?.id === row.id ? inSession : row);
+});
+
+document.querySelector('[data-save-case]').addEventListener('click', saveCase);
+window.addEventListener('storage', event => {
+  if (event.key === null || event.key.startsWith(draftsKey)) showSavedCases();
+});
+el('new-case').addEventListener('click', () => {
+  if (state.scenario && !saveCase()) return;
+  state.scenario = null;
+  state.caseId = null;
+  sessionCases.clear();
+  state.inputs = {};
+  resetResults();
+  el('terms-form').reset();
+  renderScenarios();
+  showStep(1);
 });
 
 el('results').addEventListener('input', (event) => {
@@ -576,7 +705,7 @@ el('results').addEventListener('click', (event) => {
   for (const button of el('groups').querySelectorAll('[data-pick]')) {
     const picked = [...state.selected.values()].some(({ candidate: current }) => current.product.id === button.dataset.pick);
     button.setAttribute('aria-pressed', String(picked));
-    button.textContent = picked ? 'Usuń z zestawienia' : 'Wskaż wariant';
+    button.textContent = picked ? 'Usuń z zestawienia' : 'Dodaj do pozycji';
   }
   renderSelected();
   if (state.selected.has(kind)) el('selected').focus();
@@ -599,7 +728,8 @@ function downloadDraft() {
     version: 1,
     catalogueDate: state.catalog.snapshotDate,
     scenario: state.scenario,
-    inputs: currentStep() === 2 ? readMeasurements() : state.inputs,
+    inputs: intake.snapshot().inputs,
+    progress: intake.snapshot().progress,
     installationApproval: false,
     selectedOptions: options.map((option) => ({
       name: optionLabel(option),
@@ -636,6 +766,7 @@ el('terms-form').addEventListener('input', (event) => {
     el('quote').hidden = true;
     el('quote-error').hidden = true;
   }
+  updatePreview();
 });
 el('terms-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -685,7 +816,8 @@ async function start() {
     status.hidden = true;
     el('catalog-date').textContent = 'Katalog Aniro / ' + state.catalog.snapshotDate + ' / ' + state.catalog.products.length + ' pozycji';
     renderScenarios();
-    renderAccessories(el('accessories'));
+    showSavedCases();
+    updatePreview();
   } catch {
     status.classList.add('alert');
     status.innerHTML = '<strong>Katalog Aniro jest niedostępny.</strong><p>Sprawdź, czy aplikacja działa z lokalnego serwera.</p>'

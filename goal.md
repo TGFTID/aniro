@@ -1,5 +1,16 @@
 # Aniro · plan i kryteria odbioru
 
+## Przebudowa ścieżki klienta · 25.11.2026
+
+Punkt wyjścia to czysty `main` w TGFTID/aniro, d433367. Poprzedni formularz wymagał kompletu danych od razu, a pobranego szkicu nie można było wznowić w interfejsie. Rejestr z 09.11 poprzedza powstanie tej aplikacji. Własność i lokalizację potwierdzają przekazanie i sekcja 3 nadrzędnego STAN.md.
+
+- Trzy rozłączne prace wykonują natywni GPT-6.2 Sol z własnym kontekstem, bez dodatkowego API. Jedna osoba porównuje działające kopie referencyjne i zapisuje specyfikację wizualną, druga implementuje pytania w `src/intake.js`, trzecia weryfikuje obie ścieżki w Chromium. Integrator odpowiada za wybór wzorca, zapis i wznowienie, kompletację, podgląd i ostateczny odbiór.
+- Kwoty z faktury i obecność falownika opisują sytuację użytkownika. Do porównania urządzeń służą wyłącznie dotychczasowe pola techniczne ze źródłem. Zapis lokalny przechowuje wejścia, krok, wybrane identyfikatory i warunki. Wznowienie ponownie sprawdza modele oraz wymaga aktualnego zatwierdzenia przed wydrukiem.
+- Odbiór obejmuje zapis, ponowne otwarcie, rzeczywistą treść schowka, pełne oferty dla dwóch dziedzin, niezgodności i wydruk w widoku telefonu i komputera. Zestawienie zrzutów z obu aplikacji pozostaje poza repozytorium. Lokalny adres odbioru to 127.0.0.1:4397, przyszły adres publiczny to www.aniro.gft.pl.
+- Poprzedni interfejs można odtworzyć z d433367 w osobnym worktree. Zmiana korzysta z dotychczasowego katalogu i reguł, bez migracji usług.
+
+Z dwóch uruchomionych wersji wybrano gotową paczkę pierwszego generatora. Obie miały edytor, wybór modeli, podgląd i wydruk. Z drugiej przyjęto czytelniejszą, większą typografię dokumentu. Osobny raport obok repo wskazuje dokładne ścieżki źródłowe i skróty, odtworzone zasoby oraz zakres próby z lokalną odpowiedzią demonstracyjną. W aplikacji Aniro dokument powstaje lokalnie z zatwierdzonych danych i kalkulacji.
+
 ## Cel i baza
 
 Operator wprowadza dane techniczne z jednostką i pochodzeniem, porównuje udokumentowane parametry, wskazuje wariant i po akceptacji otwiera roboczą ofertę. Zakres obejmuje kompensację, magazyny, falowniki i ocenę rozwiązań łączonych.
