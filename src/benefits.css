@@ -1,0 +1,16 @@
+
+.benefit {margin:12px 0;color:var(--ink,var(--text));font:inherit}
+.benefit summary {cursor:pointer;font-weight:650;min-height:44px;align-content:center}
+.benefit-body {padding:clamp(14px,2vw,24px);border:1px solid var(--line,var(--border));border-radius:15px;background:var(--face,var(--surface));max-width:850px}
+.benefit-top,.benefit-trend>div,.benefit-bars>div:not(.benefit-track),.benefit-range {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.benefit-body h3,.benefit-body h4,.benefit-body p {margin:0}
+.benefit-top h3 {font-size:1.15rem}.benefit-top p,.benefit-small,.benefit-axis,.benefit-trend p {font-size:.875rem;color:var(--muted,var(--text-2))}
+.benefit-period {display:flex;gap:3px}.benefit-period button,.benefit-body [data-example] {min-height:44px;padding:5px 12px;border-radius:8px}
+.benefit-period button[aria-pressed=true] {border-color:#ad281e;color:#ad281e;background:#fff1ed}
+.benefit-range {margin-top:14px;font-size:.93rem;font-weight:600}.benefit-range input[type=range]{width:100%;min-height:44px;margin:0;padding:0;border:0;accent-color:#b62a20}
+.benefit-range output {color:#ae2a20}.benefit-hero {display:flex;align-items:baseline;gap:10px;margin:0 0 12px;color:#226c53}
+.benefit-hero strong{font-size:clamp(2rem,5vw,3rem);letter-spacing:-.065em;line-height:1.1}.benefit-hero span {font-size:.95rem}
+.benefit-bars {display:grid;gap:5px;margin:12px 0}.benefit-track {height:11px;background:#edf0ed;border-radius:10px;overflow:hidden;margin-bottom:6px}.benefit-track i{display:block;height:100%;background:#a4aaa5;border-radius:inherit}.benefit-after i{background:#34836a;transition:width .15s}
+.benefit-cost {display:grid;gap:5px;font-size:.9rem;margin:12px 0}.benefit-cost input{max-width:260px;min-height:44px;padding:6px 9px;border:1px solid var(--line,var(--border));border-radius:8px}
+.benefit-trend {padding:12px;background:#f2f6f3;border:1px solid #d6e3da;border-radius:12px;color:#203b2f}.benefit-trend h4 {font-size:.94rem}.benefit-trend strong {font-variant-numeric:tabular-nums}.benefit-trend canvas {display:block;width:100%;height:108px}.benefit-axis,.benefit-trend p {color:#44574c}.benefit-body .benefit-small {margin-top:8px}
+@media(prefers-color-scheme:dark){.benefit-hero,.benefit-range output {color:var(--text,#e0ece5)}}

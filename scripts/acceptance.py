@@ -85,6 +85,9 @@ def quick_installed(page, answer):
 
 def open_questionnaire(page):
     page.locator("#quick-start-next").click()
+    expect(page.get_by_role("heading", name="Twoja oferta wstępna")).to_be_visible()
+    expect(page.locator("#measurements")).to_be_hidden()
+    page.locator("[data-details]").click()
     expect(page.locator("#step-2")).to_be_visible()
 
 
@@ -115,11 +118,13 @@ def next_question(page):
 
 
 def enter_measurements(page, inputs, check_back=False):
-    for index, (key, value) in enumerate(inputs.items()):
+    fields = {key:value for key,value in inputs.items() if key not in ("inverterVoltageV","compVoltageV") or page.locator(f'#measurements [name="{key}"]').is_visible()}
+    for index, (key, value) in enumerate(fields.items()):
         check_width(page, key)
         enter_field(page, key, value)
+        page.locator("#measurements .source-extra summary").click()
         page.locator(f'#measurements [name="{key}-source"]').fill(MEASUREMENT_SOURCE)
-        if index < len(inputs) - 1:
+        if index < len(fields) - 1:
             next_question(page)
         if check_back and index == 0:
             page.locator("#measurements").get_by_role("button", name="Wstecz", exact=True).click()
@@ -140,7 +145,8 @@ def find_product(page, sku):
 
 def choose_product(page, sku, kind):
     card = find_product(page, sku)
-    card.locator("[data-pick]").click()
+    if card.locator("[data-pick]").get_attribute("aria-pressed") != "true":
+        card.locator("[data-pick]").click()
     quantity = page.locator(f'[data-line="{kind}"][data-property="quantity"]')
     expect(quantity).to_have_value("")
     quantity.fill("1")
@@ -287,6 +293,8 @@ def start_invoice(page, origin, screen=None):
     if screen:
         capture(page, screen, "invoice", "#quick-start")
     page.locator("#quick-start-invoice").click()
+    expect(page.locator("#first-offer")).to_be_visible()
+    page.locator("[data-details]").click()
     expect(page.locator("#step-2")).to_be_visible()
     expect_question(page, "reactivePowerKvar")
 
@@ -454,49 +462,20 @@ def save_partial_start(page, origin, key, value):
         expect(quick_field(page, field)).to_have_value(value if field == key else "")
 
 
-def confirm_quick_source(page, key, value):
-    expect_question(page, key)
-    expect(page.locator("#intake-heading")).to_contain_text("Skąd pochodzi")
-    field = page.locator(f'#measurements [name="{key}"]')
-    source = page.locator(f'#measurements [name="{key}-source"]')
-    expect(field).to_have_value(value)
-    expect(source).to_have_value("")
-    submit = page.locator('#measurements button[type="submit"]')
-    submit.click()
-    expect(page.locator("#intake-error")).to_contain_text("Podaj źródło")
-    expect(source).to_be_focused()
-    expect(page.locator('[data-step="3"]')).to_be_disabled()
-    source.fill(MEASUREMENT_SOURCE)
-    submit.click()
-
-
 def check_only_power(page, origin):
     save_partial_start(page, origin, "acPowerKw", "20")
-    expect(page.locator(".quick-suggestion")).to_contain_text("falownik")
     open_questionnaire(page)
-    expect_question(page, "acPowerKw")
-    page.locator('#measurements [data-intake-action="unknown"]').click()
-    message = page.locator("#intake-message").input_value()
-    assert "20 kW" in message and "źródł" in message.lower(), message
-    assert "magazyn" not in message.lower() and "kompensacj" not in message.lower(), message
-    page.locator('#measurements [data-intake-action="return"]').click()
-    confirm_quick_source(page, "acPowerKw", "20")
-    expect_question(page, "inverterVoltageV")
-    enter_measurements(page, {"inverterVoltageV": "400", "inverterUse": "hybrid"})
+    expect_question(page, "inverterUse")
+    expect(page.locator("#measurements")).not_to_contain_text("Skąd pochodzi")
+    enter_field(page,"inverterUse","hybrid")
+    page.get_by_role("button",name="Porównaj urządzenia",exact=True).click()
     expect(page.locator("#groups > section > h3")).to_have_text(["Falowniki"])
     page.locator('[data-step="1"]').click()
-    quick_field(page, "billTotal").fill("1200")
+    quick_field(page, "acPowerKw").fill("21")
     open_questionnaire(page)
     expect(page.locator("#intake-heading")).to_have_text("Możesz porównać urządzenia")
     page.get_by_role("button", name="Porównaj urządzenia", exact=True).click()
     expect(page.locator("#groups > section > h3")).to_have_text(["Falowniki"])
-
-    page.locator('[data-step="1"]').click()
-    quick_field(page, "acPowerKw").fill("21")
-    open_questionnaire(page)
-    confirm_quick_source(page, "acPowerKw", "21")
-    expect(page.locator("#step-3")).to_be_visible()
-
 
 def check_only_amounts(page, origin):
     save_partial_start(page, origin, "reactiveFee", "250")
@@ -514,10 +493,53 @@ def check_only_amounts(page, origin):
     save_partial_start(page, origin, "billTotal", "1200")
     expect(page.locator(".quick-suggestion")).to_be_hidden()
     page.locator("#quick-start-next").click()
-    expect(page.locator("#quick-start-feedback")).to_be_visible()
-    expect(page.locator("#step-2")).to_be_hidden()
-    expect(quick_field(page, "billTotal")).to_have_value("1200")
+    expect(page.locator("#first-offer")).to_be_visible()
+    expect(page.locator("#first-offer select")).to_have_count(3)
+    solar = page.locator("#first-offer .offer-benefits details").last
+    solar.locator("summary").click()
+    for name, value in {"avoided":"200","tariff":"1,10","lostRevenue":"20"}.items():
+        solar.locator(f'[name="{name}"]').fill(value)
+    assert compact(solar.locator("[data-solar-total]").inner_text()) in ("200zł","200,00zł")
+    solar.locator('[data-solar-period="year"]').click()
+    assert compact(solar.locator("[data-solar-total]").inner_text()) in ("2400zł","2400,00zł")
 
+
+def check_first_offer_benefits(page, origin, screen):
+    page.goto(origin)
+    quick_field(page, "billTotal").fill("48000")
+    quick_field(page, "reactiveFee").fill("7200")
+    page.locator('[name="billingPeriod"][value="year"]').check()
+    quick_kind(page,"compensator").check()
+    page.locator("#quick-start-next").click()
+    offer = page.locator("#first-offer")
+    expect(offer).to_be_visible()
+    expect(page.locator("#measurements")).to_be_hidden()
+    pick = offer.locator("[data-model=compensator]")
+    ids = pick.locator("option").evaluate_all("rows => rows.map(row=>row.value).filter(Boolean)")
+    assert len(ids)>1
+    pick.select_option(ids[-1])
+    capture(page,screen,"initial-offer","#first-offer")
+    offer.locator("[data-benefits]").click()
+    expect(offer.locator("[data-info]")).to_contain_text("roczna")
+    assert compact(offer.locator("[data-saving]").inner_text()) == "7200,00zł" or compact(offer.locator("[data-saving]").inner_text()) == "7200zł"
+    offer.locator("[data-view=month]").click()
+    assert compact(offer.locator("[data-saving]").inner_text()) in ("600zł","600,00zł")
+    range_control=offer.locator(".benefit-range input")
+    range_control.press("Home")
+    assert compact(offer.locator("[data-saving]").inner_text()) in ("0zł","0,00zł")
+    range_control.press("End")
+    offer.locator(".benefit-cost input").first.fill("3600")
+    expect(offer.locator("[data-return]")).to_contain_text("6 mies.")
+    capture(page,screen,"benefits","#first-offer .offer-benefits > .benefit",align=True)
+    page.locator("[data-save-case]").click()
+    row = page.locator("#saved-cases [data-resume-case]").first
+    row_id=row.get_attribute("data-resume-case")
+    page.reload()
+    page.locator(f'[data-resume-case="{row_id}"]').click()
+    expect(pick).to_have_value(ids[-1])
+    offer.locator("[data-benefits]").click()
+    expect(offer.locator(".benefit-cost input").first).to_have_value("3600")
+    check_width(page, "oferta i korzyści")
 
 def check_existing_inverter(page, origin):
     model = "SINEXCEL ISUNA 20000T"
@@ -534,7 +556,6 @@ def check_existing_inverter(page, origin):
     expect(page.locator("#measurements")).to_contain_text(model)
     expect(page.locator("#measurements")).to_contain_text("BMS")
     expect(page.locator('#measurements [name="inverterModel"]')).to_have_count(0)
-    confirm_quick_source(page, "capacityKwh", "60")
     expect_question(page, "capacityBasis")
     enter_measurements(page, {"capacityBasis": "nominal", "storagePowerKw": "10"})
     expect(page.locator("#groups > section > h3")).to_have_text(["Magazyny energii"])
@@ -688,15 +709,16 @@ def audit(origin, preview, expected_sha, channel):
                 check_only_power(page, origin)
                 check_only_amounts(page, origin)
                 check_existing_inverter(page, origin)
+                check_first_offer_benefits(page, origin, screen)
 
                 # Start the help case without earlier persistent synthetic drafts.
                 page.evaluate("localStorage.clear()")
 
                 page = open_help_and_resume(context, page, origin, new_page, screen)
                 pdfs = {"compensation": check_compensation(page, screen), "pair": check_pair(page, origin, screen)}
-                scenarios = ["four-empty-slider-fields", "explicit-zero-versus-empty", "help-from-empty-start",
-                             "only-power-resume-confirm-source", "known-source-kept-until-power-changes", "only-reactive-fee-resume",
-                             "only-total-asks-for-scope", "known-inverter-and-capacity", "manual-scope-over-suggestions",
+                scenarios = ["editable-first-offer-and-monthly-yearly-benefits","four-empty-slider-fields", "explicit-zero-versus-empty", "help-from-empty-start",
+                             "declared-power-skips-source-and-voltage", "editable-power-without-repeat-question", "only-reactive-fee-resume",
+                             "bill-only-automatic-offer", "known-inverter-and-capacity", "manual-scope-over-suggestions",
                              "invoice-copy-save-resume", "back-keeps-data",
                              "compensation-offer-print",
                              "incompatible-inverter-blocked", "documented-pair-offer-print",

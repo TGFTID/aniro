@@ -1,5 +1,9 @@
 # Aniro · plan i kryteria odbioru
 
+## Oferta po pierwszej stronie · 25.11.2026
+
+Właściciel zatwierdził karty z wariantu 2 i skrócił ścieżkę do formularza, edytowalnej oferty i korzyści. Przyjmujemy deklaracje klienta oraz odwoływalne założenie 3 fazy / 400 V. Oba okresy (faktura, wynik) są niezależne. Automatyczna propozycja korzysta z lokalnych udokumentowanych parametrów i cen, techniczny dobór i druk pozostają dostępne. Weryfikacja obejmuje zmianę modelu, zapis/wznowienie symulacji, przełączanie okresów, przykłady danych i PDF. Punkt powrotu do wcześniejszego startu: ac306a2.
+
 ## Wariant 2 w aplikacji · 25.11.2026
 
 Baza 48f9215 na main. Zaakceptowany wzór to widok Karty z lokalnego porównania. Pierwszy ekran gromadzi wybór dowolnego podzbioru trzech klas urządzeń, cztery opcjonalne wartości i dane istniejącego falownika. Wcześniejsza wersja zbierała kwoty dopiero podczas ankiety i obsługiwała pięć zestawów klas.

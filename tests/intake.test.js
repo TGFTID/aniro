@@ -51,29 +51,25 @@ test("dane ze źródłem pomijają pytanie tylko przy nowym starcie, a wznowieni
   assert.equal(draft.progress.position, "reactiveDirection");
   assert.deepEqual(draft.progress.quick, quick);
   assert.equal(draft.progress.invoice.reactiveFee, quick.reactiveFee);
-  intake.open("compensation-inverter", draft.inputs, { ...draft.progress, position: "compVoltageV" });
+  intake.open("compensation-inverter", draft.inputs, { ...draft.progress, position: "gridConnection" });
   instance.click("back");
   assert.equal(intake.snapshot().progress.position, "reactiveDirection");
   instance.click("back");
   assert.equal(instance.backs(), 1);
 });
 
-test("pomoc i wznowienie zachowują wstępną liczbę i pozwalają uzupełnić jej źródło", () => {
+test("wznowienie akceptuje zadeklarowane kWh i pomoc dotyczy dopiero brakujących danych", () => {
   const quick = makeQuick({ kinds: ["storage"], capacityKwh: "4,5", siteInverters: "yes", inverterModel: "ISUNA <test>" });
   const { intake, fields, click } = setup();
-  intake.open("storage", { capacityKwh: { value: "4,5", source: "" } }, { quick, requestHelp: true });
+  intake.open("storage", { capacityKwh: {value:"4,5", source:""} }, { quick, requestHelp:true, position:"capacityKwh" });
   const { inputs, progress } = intake.snapshot();
-  assert.equal(progress.missingQuestion, "capacityKwh");
-  assert.equal(progress.requestHelp, undefined);
-  assert.equal(inputs.capacityKwh.value, "4,5");
-  assert.match(fields.innerHTML, /Podana pojemność magazynu to 4,5 kWh\. Proszę potwierdzić tę wartość i podać jej źródło/);
-  assert.match(fields.innerHTML, /ISUNA &lt;test&gt;.*komunikację BMS/);
+  assert.equal(progress.missingQuestion, "capacityBasis");
+  assert.equal(inputs.capacityKwh.source, "Deklaracja klienta");
+  assert.match(fields.innerHTML, /Podana pojemność magazynu to 4,5 kWh/);
   intake.open("storage", inputs, progress);
   click("return");
-  assert.match(fields.innerHTML, /Skąd pochodzi podana pojemność magazynu\?/);
-  assert.match(fields.innerHTML, /id="field-capacityKwh"[^>]+value="4,5"/);
-  click("unknown");
-  assert.equal(intake.snapshot().inputs.capacityKwh.value, "4,5");
+  assert.equal(intake.snapshot().progress.position,"capacityBasis");
+  assert.doesNotMatch(fields.innerHTML,/Skąd pochodzi/);
 });
 
 test("wiadomości dla dwóch klas proszą o właściwe pomiary i właściwe dane urządzenia", () => {

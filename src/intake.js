@@ -1,3 +1,4 @@
+import { declaredSource } from './case-start.js';
 import { getInputFields, selectProducts } from './selection.js';
 
 const invoiceStep = 'invoice';
@@ -60,13 +61,8 @@ function optionsMarkup(options, chosen) {
   ).join('');
 }
 
-const providedQuestions = {
-  acPowerKw: 'Skąd pochodzi podana moc falownika?',
-  capacityKwh: 'Skąd pochodzi podana pojemność magazynu?',
-};
-
 function isProvided(id, entered, progress) {
-  return Object.hasOwn(providedQuestions, id) && progress.quick?.[id] && entered?.value;
+  return Boolean(progress.quick?.[id] && entered?.value);
 }
 
 function existingInverterModel(progress) {
@@ -75,10 +71,7 @@ function existingInverterModel(progress) {
 }
 
 function fieldMarkup(field, entered, scenario, progress) {
-  const [defaultQuestion, defaultHint] = questions[field.id] ?? [field.label, field.hint];
-  const provided = isProvided(field.id, entered, progress);
-  const question = provided ? providedQuestions[field.id] : defaultQuestion;
-  const hint = provided ? 'Wartość z ekranu startowego możesz poprawić poniżej. Podaj jej źródło.' : defaultHint;
+  const [question, hint] = questions[field.id] ?? [field.label, field.hint];
   const { value, source } = entered ?? {};
   const caption = field.unit ? `Wartość (${text(field.unit)})` : 'Odpowiedź';
   const attributes = `name="${field.id}" id="field-${field.id}" aria-describedby="intake-hint" required`;
@@ -86,7 +79,7 @@ function fieldMarkup(field, entered, scenario, progress) {
     ? `<select ${attributes}>${optionsMarkup(field.options, value)}</select>`
     : `<input type="text"${field.type === 'number' ? ' inputmode="decimal"' : ''} ${attributes} value="${text(value)}">`;
   let existingInverterHint = '';
-  if (field.id === 'capacityKwh') {
+  if (field.id === 'capacityKwh' || field.id === 'capacityBasis') {
     const model = existingInverterModel(progress);
     if (progress.siteInverters === 'yes') {
       const identification = model ? 'Falownik na obiekcie: ' + text(model) + '.' : 'Odczytaj dokładny model falownika z tabliczki znamionowej.';
@@ -101,9 +94,8 @@ function fieldMarkup(field, entered, scenario, progress) {
     ${unknownAction}
     ${existingInverterHint}
     <div class="fields-row"><label>${caption}${valueField}</label>
-    <label>Skąd masz tę informację?<input id="field-${field.id}-source" type="text" name="${field.id}-source" required
-      value="${text(source)}" aria-describedby="intake-source-hint"></label></div>
-    <p id="intake-source-hint" class="muted">Wystarczy np. nazwa dokumentu i strona albo data pomiaru.</p>
+    <details class="source-extra"><summary>Dodaj dokument lub datę pomiaru (opcjonalnie)</summary><label>Dokument lub pomiar<input id="field-${field.id}-source" type="text" name="${field.id}-source"
+      value="${text(source === declaredSource ? '' : source)}"></label></details></div>
   </div>`;
 }
 
@@ -130,9 +122,8 @@ function requestForElectrician(technicalFields, values, progress) {
   }
   if (hasStorage) {
     if (isProvided('capacityKwh', values.capacityKwh, progress)) {
-      const { value, source } = values.capacityKwh;
+      const { value } = values.capacityKwh;
       requests.push('Podana pojemność magazynu to ' + String(value).replace('.', ',') + ' kWh. '
-        + (source ? '' : 'Proszę potwierdzić tę wartość i podać jej źródło. ')
         + 'Proszę wskazać, czy pojemność jest znamionowa czy użytkowa, oraz podać wymaganą znamionową moc ładowania i rozładowania w kW.');
     } else {
       requests.push('Proszę podać minimalną pojemność magazynu w kWh (znamionową lub użytkową) oraz wymaganą znamionową moc ładowania i rozładowania w kW.');
@@ -148,9 +139,8 @@ function requestForElectrician(technicalFields, values, progress) {
   }
   if (hasInverter) {
     if (isProvided('acPowerKw', values.acPowerKw, progress)) {
-      const { value, source } = values.acPowerKw;
+      const { value } = values.acPowerKw;
       requests.push('Podana moc wyjściowa AC jednego falownika to ' + String(value).replace('.', ',') + ' kW. '
-        + (source ? '' : 'Proszę potwierdzić tę wartość i podać jej źródło. ')
         + 'Proszę podać napięcie AC w V w trybie sieciowym oraz funkcję falownika.');
     } else {
       requests.push('Proszę podać wymaganą moc wyjściową AC jednego falownika w kW, jego napięcie AC w V w trybie sieciowym oraz funkcję falownika.');
@@ -177,7 +167,7 @@ export function createIntake({ form, fields, onChange, onComplete, onSave, onBac
       if (!progress.quick) context.push(invoiceStep);
       if (!progress.quick?.siteInverters) context.push(invertersStep);
     }
-    const available = [...context, ...activeTechnicalSteps().filter((id) => !progress.skippedFields?.includes(id))];
+    const available = [...context, ...activeTechnicalSteps().filter(id => !progress.skippedFields?.includes(id) && !(['inverterVoltageV','compVoltageV'].includes(id) && inputs[id]?.value))];
     return available.length ? available : [readyStep];
   }
 
@@ -205,12 +195,19 @@ export function createIntake({ form, fields, onChange, onComplete, onSave, onBac
       siteInverters: ['yes', 'no', 'unknown'].includes(siteInverters) ? siteInverters : '',
       missingQuestion: nextProgress?.missingQuestion,
     };
+    for (const [id, entry] of Object.entries(inputs)) {
+      if (entry.value !== '' && !entry.source?.trim()) entry.source = declaredSource;
+    }
+    const voltageFields = technicalFields.filter(field => ['inverterVoltageV','compVoltageV'].includes(field.id));
+    for (const {id} of voltageFields) {
+      if (!inputs[id]?.value) inputs[id] = {value: quick?.networkVoltage || '400', source: quick?.networkVoltage ? declaredSource : 'Założenie do oferty: sieć trójfazowa 400 V'};
+    }
     const missing = selectProducts(scenario, inputs, emptyCatalog).missingInputs.map(({ id }) => id);
     if (quick) {
       progress.quick = structuredClone(quick);
       const skipped = Array.isArray(nextProgress.skippedFields) ? nextProgress.skippedFields
         : progress.position ? [] : activeTechnicalSteps();
-      progress.skippedFields = activeTechnicalSteps().filter((id) => skipped.includes(id) && !missing.includes(id));
+      progress.skippedFields = activeTechnicalSteps().filter(id => !missing.includes(id) && (skipped.includes(id) || isProvided(id, inputs[id], progress) || voltageFields.some(field => field.id === id)));
     }
     const available = steps();
     if (!available.includes(progress.position)) progress.position = available[0];
@@ -263,7 +260,7 @@ export function createIntake({ form, fields, onChange, onComplete, onSave, onBac
             { value: 'yes', label: 'Tak' }, { value: 'no', label: 'Nie' }, { value: 'unknown', label: 'Nie wiem' },
           ], progress.siteInverters)}</select>`;
       } else if (progress.position === readyStep) {
-        body = '<h3 id="intake-heading" tabindex="-1">Możesz porównać urządzenia</h3><p>Masz już komplet danych i ich źródła.</p>';
+        body = '<h3 id="intake-heading" tabindex="-1">Możesz porównać urządzenia</h3><p>Masz już dane do porównania.</p>';
       } else {
         body = fieldMarkup(field, inputs[field.id], scenario, progress);
       }
@@ -327,7 +324,7 @@ export function createIntake({ form, fields, onChange, onComplete, onSave, onBac
       if (!property) return;
       const current = inputs[id] ?? { value: '', source: '' };
       if (current[property] === value) return;
-      inputs[id] = { ...current, [property]: value };
+      inputs[id] = property === 'source' ? {...current, source:value.trim() || declaredSource} : {value, source:value ? declaredSource : ''};
       event.target.removeAttribute('aria-invalid');
       const available = steps();
       const index = available.indexOf(id);
@@ -401,11 +398,7 @@ export function createIntake({ form, fields, onChange, onComplete, onSave, onBac
       }
       case 'unknown':
         if (progress.position === invertersStep) progress.siteInverters = 'unknown';
-        if (isProvided(progress.position, inputs[progress.position], progress)) {
-          inputs[progress.position].source = '';
-        } else {
-          delete inputs[progress.position];
-        }
+        delete inputs[progress.position];
         setPosition(progress.position, progress.position);
         break;
       case 'return':

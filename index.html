@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./src/styles.css">
   <link rel="stylesheet" href="./src/workspace.css">
   <link rel="stylesheet" href="./src/quick-start.css">
+  <link rel="stylesheet" href="./src/benefits.css">
   <script type="module" src="./src/ui.js"></script>
 </head>
 <body>
@@ -18,7 +19,8 @@
   <header class="topbar">
     <div class="shell brand-row">
       <img class="brand-logo main-logo" src="./src/aniro-logo.png" alt="Aniro" width="135" height="34">
-      <h1 class="brand-section">Generator ofert</h1>
+      <h1 class="brand-section">Dobór urządzeń</h1>
+      <a class="catalog-link" href="https://katalog.aniro.pl/" target="_blank" rel="noopener">Katalog ↗</a>
       <div id="case-tools" class="case-tools" hidden>
         <button type="button" data-save-case>Zapisz sprawę</button>
         <button type="button" id="new-case">Nowa sprawa</button>
@@ -29,6 +31,7 @@
   <main id="main" class="shell">
     <div class="workspace-bar"><span id="stage-label">Nowa sprawa</span><span id="save-status" role="status"></span></div>
     <div class="workspace" data-step-active="1">
+      <section id="first-offer" hidden></section>
       <div class="editor">
       <nav aria-label="Etapy doboru" class="workflow">
         <ol>

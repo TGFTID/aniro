@@ -16,9 +16,10 @@ export function scenarioFor(kinds = []) {
 
 export function hasQuickData(start) {
   return start && (start.kinds?.length > 0 || Object.entries(start).some(([key,value]) =>
-    key !== 'kinds' && String(value ?? '').trim() !== ''));
+    !['kinds','billingPeriod'].includes(key) && String(value ?? '').trim() !== ''));
 }
 
+export const declaredSource = 'Deklaracja klienta';
 const technicalValues = {acPowerKw: 'inverter', capacityKwh: 'storage'};
 
 export function startFromIntake(scenario, {inputs, progress}) {
@@ -29,6 +30,8 @@ export function startFromIntake(scenario, {inputs, progress}) {
   for (const [key, kind] of Object.entries(technicalValues)) {
     if (kinds.includes(kind)) start[key] = String(inputs[key]?.value ?? '');
   }
+  const voltage = inputs.inverterVoltageV?.value ?? inputs.compVoltageV?.value;
+  if (voltage != null && Number(voltage) !== 400) start.networkVoltage = String(voltage);
   return start;
 }
 
@@ -41,7 +44,16 @@ export function mergeStartInputs(previous, start) {
     if (!value) { delete inputs[key]; continue; }
     const before = String(inputs[key]?.value ?? '').trim();
     const equal = before !== '' && Number(before.replace(',', '.')) === Number(value.replace(',', '.'));
-    inputs[key] = {value, source: equal ? inputs[key].source : ''};
+    inputs[key] = {value, source: equal && inputs[key].source ? inputs[key].source : declaredSource};
+  }
+  for (const [group, field] of [['inverter','inverterVoltageV'], ['compensator','compVoltageV']]) {
+    if (!start.kinds.includes(group)) continue;
+    const custom = start.networkVoltage;
+    if (Object.hasOwn(start,'networkVoltage') || !inputs[field]?.value) {
+      const value = custom || '400';
+      const source = custom ? declaredSource : 'Założenie do oferty: sieć trójfazowa 400 V';
+      if (String(inputs[field]?.value) !== value) inputs[field] = {value, source};
+    }
   }
   return inputs;
 }

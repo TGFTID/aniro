@@ -28,7 +28,7 @@ test('changing or clearing an active value invalidates only its source', () => {
   const previous = { acPowerKw:{value:'12.30',source:'projekt'}, capacityKwh:{value:'48',source:'projekt B'} };
   const continueWith = value => mergeStartInputs(previous, {kinds:['inverter'], acPowerKw:value});
   assert.equal(continueWith('12,3').acPowerKw.source, 'projekt');
-  assert.equal(continueWith('12.45').acPowerKw.source, '');
+  assert.equal(continueWith('12.45').acPowerKw.source, 'Deklaracja klienta');
   assert.equal(continueWith('').acPowerKw, undefined);
   assert.deepEqual(continueWith('').capacityKwh, previous.capacityKwh);
   assert.equal(previous.acPowerKw.value, '12.30');

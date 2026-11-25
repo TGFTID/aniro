@@ -1,7 +1,7 @@
 const devices = [
-  { kind: 'inverter', label: 'Falownik PV' },
-  { kind: 'storage', label: 'Magazyn energii' },
-  { kind: 'compensator', label: 'Kompensator mocy biernej' },
+  { kind: 'inverter', label: 'Falownik PV', series: 'Sinexcel Isuna' },
+  { kind: 'storage', label: 'Magazyn energii', series: 'Sunwoda OASIS' },
+  { kind: 'compensator', label: 'Kompensator mocy biernej', series: 'Sinexcel ASVG' },
 ]
 
 const amounts = [
@@ -37,17 +37,18 @@ function numericMarkup({ key, label, unit, max, positive }) {
 export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnknown }) {
   host.innerHTML = `
     <h2 id="quick-start-title" tabindex="-1">Co chcesz dobrać?</h2>
-    <p class="quick-hint">Możesz zaznaczyć kilka urządzeń.</p>
+    <p class="quick-hint">Zaznacz urządzenia lub wpisz dane do automatycznej propozycji.</p>
     <div class="quick-cards" role="group" aria-label="Potrzebne urządzenia">
-      ${devices.map(({ kind, label }) => `<label class="quick-card">
+      ${devices.map(({ kind, label, series }) => `<label class="quick-card">
         <span class="quick-photo"><img alt="" src="./src/quick-${kind}.png"></span>
-        <span class="quick-device-label">${label}</span>
+        <span class="quick-device-label">${label}<small>${series}</small></span>
         <input type="checkbox" name="kinds" value="${kind}" data-kind="${kind}">
       </label>`).join('')}
     </div>
     <section class="quick-values" aria-labelledby="quick-values-title">
       <h3 id="quick-values-title">Jakie wartości już znasz?</h3>
       <p class="quick-hint">Przesuń suwak lub wpisz liczbę. Nieznane pola zostaw puste.</p>
+      <div class="period-pick"><span>Faktura za</span><label><input type="radio" name="billingPeriod" value="month" checked>Miesiąc</label><label><input type="radio" name="billingPeriod" value="year">Rok</label></div>
       <div class="quick-value-grid">${amounts.map(numericMarkup).join('')}</div>
       <button id="quick-start-invoice" class="quick-link" type="button">Mam na fakturze opłatę za energię bierną</button>
     </section>
@@ -66,10 +67,11 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
     <p class="quick-suggestion" aria-live="polite" hidden></p>
     <div class="quick-actions">
       <output class="quick-count" aria-live="polite"></output>
-      <button id="quick-start-next" class="primary" type="button">Dalej →</button>
+      <button id="quick-start-next" class="primary" type="button">Pokaż ofertę →</button>
     </div>
     <div class="quick-secondary">
       <button id="quick-start-unknown" class="quick-link" type="button">Nie wiem, od czego zacząć</button>
+      <details class="quick-services network-settings"><summary>Sieć <span id="network-label">3 fazy · 400 V</span></summary><label>Napięcie sieci (V)<input name="networkVoltage" type="number" min="1" max="2000" step="any" placeholder="400"></label></details>
       <details class="quick-services"><summary>Panele PV i wsparcie techniczne</summary>
         <a href="https://aniro.pl/fotowoltaika-w-ofercie-aniro/" target="_blank" rel="noopener">Panele PV · zapytaj o dostępność ↗</a>
         <a href="https://aniro.pl/" target="_blank" rel="noopener">Jakość energii, prefabrykacja i serwis ↗</a>
@@ -95,6 +97,8 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
       ...Object.fromEntries(fields.map(field => [field.key, field.entry.value.trim()])),
       siteInverters: radios.find(radio => radio.checked)?.value ?? '',
       inverterModel: model.value.trim(),
+      billingPeriod: query('[name=billingPeriod]:checked').value,
+      networkVoltage: query('[name=networkVoltage]').value,
     }
   }
 
@@ -120,9 +124,10 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
 
   function render() {
     const data = snapshot()
+    query('#network-label').textContent = data.networkVoltage ? data.networkVoltage + ' V' : '3 fazy · 400 V'
     const filled = fields.filter(field => validate(field) && data[field.key]).length
     const proposed = data.kinds.length ? [] : getProposedKinds(data)
-    query('.quick-count').textContent = `Wpisane wartości: ${filled} z 4`
+    query('.quick-count').textContent = filled ? `Wpisane wartości: ${filled} z 4` : 'Wszystkie wartości są opcjonalne'
     query('.quick-model').hidden = data.siteInverters !== 'yes'
     unknown.textContent = data.kinds.length
       ? 'Nie wiem, jak zebrać dane'
@@ -144,12 +149,15 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
     for (const field of fields) field.entry.value = data[field.key] ?? ''
     for (const radio of radios) radio.checked = radio.value === data.siteInverters
     model.value = data.inverterModel ?? ''
+    query('[name=billingPeriod][value=' + (data.billingPeriod === 'year' ? 'year' : 'month') + ']').checked = true
+    query('[name=networkVoltage]').value = data.networkVoltage ?? ''
     feedback.hidden = true
     render()
   }
 
   for (const control of [...cards, ...radios]) control.addEventListener('change', changed)
   model.addEventListener('input', changed)
+  for (const control of host.querySelectorAll('[name=billingPeriod], [name=networkVoltage]')) control.addEventListener('input', changed)
   for (const field of fields) {
     field.entry.addEventListener('input', changed)
     field.range.addEventListener('input', () => {
@@ -161,6 +169,7 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
   function validateBeforeContinuing() {
     const invalid = fields.find(field => !validate(field))
     invalid?.entry.focus()
+    if (!query('[name=networkVoltage]').reportValidity()) return false
     return !invalid
   }
 
@@ -168,6 +177,7 @@ export function createQuickStart(host, { onContinue, onChange, onInvoice, onUnkn
     if (!validateBeforeContinuing()) return
     const data = snapshot()
     if (!data.kinds.length) data.kinds = getProposedKinds(data)
+    if (!data.kinds.length && data.billTotal !== '') data.kinds = devices.map(device => device.kind)
     if (!data.kinds.length) {
       feedback.textContent = 'Zaznacz urządzenie albo wybierz pomoc z pomiarem energii biernej.'
       feedback.hidden = false

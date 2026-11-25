@@ -1,3 +1,4 @@
+import { renderInitialOffer } from './initial-offer.js';
 import { createQuickStart } from './quick-start.js';
 import { scenarioKinds, scenarioFor, hasQuickData, startFromIntake, mergeStartInputs } from './case-start.js';
 import { createIntake } from './intake.js';
@@ -77,7 +78,30 @@ function updateSteps(current) {
   }
 }
 
+let earlyView;
+let earlySession;
+let earlyPrefs = {};
+function leaveEarlyOffer() {
+  if (earlyView) { earlyPrefs = earlyView.snapshot(); earlyView.destroy(); earlySession.abort(); earlyView = null; }
+  el('first-offer').hidden = true;
+  document.querySelector('.workspace').dataset.early = 'false';
+}
+function showInitialOffer() {
+  showStep(2);
+  const host = el('first-offer');
+  host.hidden = false;
+  document.querySelector('.workspace').dataset.early = 'true';
+  earlySession = new AbortController();
+  const data = startFromIntake(state.scenario,intake.snapshot());
+  earlyView = renderInitialOffer(host,state.catalog,data,earlyPrefs,{
+    signal:earlySession.signal, edit:() => showStep(1), details:() => showStep(2),
+    help:() => continueStart(data,true),
+  });
+  host.querySelector('h2').focus({preventScroll:true});
+  window.scrollTo(0,0);
+}
 function showStep(step) {
+  leaveEarlyOffer();
   if (step === 1 && currentStep() !== 1 && state.scenario && !state.startEdited) {
     quick.open(startFromIntake(state.scenario, intake.snapshot()));
   }
@@ -165,6 +189,7 @@ function caseData() {
   const start = step === 1 ? quick.snapshot() : startFromIntake(state.scenario, {inputs,progress});
   return {
     version: 2, id: state.caseId, scenario: state.scenario, inputs, progress, start,
+    initialOffer: Boolean(earlyView), offerPrefs: earlyView?.snapshot() ?? earlyPrefs,
     measurements: state.measurements, startEdited: state.startEdited, evaluated: Boolean(state.result),
     step, updated: new Date().toISOString(), catalogDate: state.catalog.snapshotDate,
     lines: [...state.selected.values()].map(({candidate, quantity, quantitySource, technicalSource}) =>
@@ -207,6 +232,8 @@ function rememberInputs() {
 }
 
 function openCase(scenario, draft) {
+  leaveEarlyOffer();
+  earlyPrefs = draft?.offerPrefs ?? {};
   state.scenario = scenario;
   state.caseId = draft?.id || newId();
   state.startEdited = draft?.startEdited === true;
@@ -243,7 +270,8 @@ function openCase(scenario, draft) {
   }
   // A loaded draft owns its own first screen even when the previous case was at another step.
   if (step === 1) updateSteps(1);
-  showStep(step);
+  if (draft?.step === 2 && draft?.initialOffer) showInitialOffer();
+  else showStep(step);
   showSavedCases();
 }
 
@@ -277,6 +305,15 @@ const intake = createIntake({
     }
     el('input-errors').hidden = true;
     state.result = result;
+    const previousLines = new Map(state.selected);
+    state.selected.clear();
+    for (const [kind, id] of Object.entries(earlyPrefs.choices ?? {})) {
+      const candidate = findCandidate(id);
+      if (candidate && candidate.product.kind === kind && candidate.status !== 'fails') {
+        const previous = previousLines.get(kind);
+        state.selected.set(kind, previous?.candidate.product.id === id ? {...previous,candidate} : {candidate, quantity:'', quantitySource:'', technicalSource:''});
+      }
+    }
     renderResults();
     showStep(3);
   },
@@ -414,7 +451,7 @@ function contextMarkup(progress) {
   const {reactiveFee, billTotal, period} = progress.invoice ?? {};
   const money = value => value == null || value === '' ? '' : value + ' zł';
   return [
-    ['Okres z faktury', period],
+    ['Okres z faktury', period || ({month:'Miesiąc', year:'Rok'})[progress.quick?.billingPeriod]],
     ['Opłata za energię bierną', money(reactiveFee)],
     ['Cała faktura', money(billTotal)],
     ['Falowniki na obiekcie', {yes:'Tak', no:'Nie', unknown:'Do sprawdzenia'}[progress.siteInverters]],
@@ -698,14 +735,14 @@ function continueStart(data, requestHelp = false) {
   const scenario = scenarioFor(data.kinds);
   if (!scenario) return;
   if (scenario === state.scenario && !state.startEdited && !requestHelp && intake.snapshot().progress.quick) {
-    showStep(2);
+    showInitialOffer();
     return;
   }
   const draft = caseData();
   const inputs = mergeStartInputs(state.measurements, data);
   const invoice = {...draft.progress.invoice, billTotal:data.billTotal, reactiveFee:data.reactiveFee};
   const progress = {quick:data, siteInverters:data.siteInverters, invoice, requestHelp};
-  openCase(scenario, {...draft, step:2, evaluated:false, startEdited:false, option:null, lines:[],
+  openCase(scenario, {...draft, step:2, initialOffer:!requestHelp, evaluated:false, startEdited:false, option:null, lines:[],
     inputs, measurements:inputs, start:data, progress});
 }
 
@@ -738,6 +775,8 @@ window.addEventListener('storage', event => {
 });
 el('new-case').addEventListener('click', () => {
   if (state.caseId && !saveCase()) return;
+  leaveEarlyOffer();
+  earlyPrefs = {};
   state.scenario = null;
   state.caseId = null;
   state.startEdited = false;
@@ -880,6 +919,14 @@ async function start() {
     status.hidden = true;
     el('catalog-date').textContent = 'Katalog Aniro / ' + state.catalog.snapshotDate + ' / ' + state.catalog.products.length + ' pozycji';
     el('quick-start').inert = false;
+    if (location.hash.startsWith('#cards=')) {
+      const transfer = new URLSearchParams(location.hash.slice(1));
+      const data = Object.fromEntries(['billTotal','reactiveFee','acPowerKw','capacityKwh','siteInverters','inverterModel','billingPeriod'].map(key => [key,transfer.get(key) ?? '']));
+      data.kinds = (transfer.get('cards') ?? '').split(',').filter(kind => ['inverter','storage','compensator'].includes(kind));
+      history.replaceState(null,'',location.pathname+location.search);
+      quick.open(data);
+      el('quick-start-next').click();
+    }
     showSavedCases();
     updatePreview();
   } catch {
